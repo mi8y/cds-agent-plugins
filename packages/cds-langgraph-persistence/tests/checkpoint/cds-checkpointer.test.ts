@@ -16,7 +16,9 @@ export const cdsCheckpointSaverTestInitializer: CheckpointSaverTestInitializer<C
 
     async beforeAll() {
       // since tests are run from the root of the monorepo, we need to set the cds.root to the path of the package
-      cds.root = fileURLToPath(import.meta.resolve("@mi8y/cds-langgraph-persistence"));
+      cds.root = fileURLToPath(
+        import.meta.resolve("@mi8y/cds-langgraph-persistence"),
+      );
 
       // cds file from @mi8y/langgraph-cds-model package
       const cdsFilePath = fileURLToPath(
