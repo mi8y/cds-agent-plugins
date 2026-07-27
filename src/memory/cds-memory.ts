@@ -207,18 +207,22 @@ export class CdsMemoryStore extends BaseStore {
 
     const items = await cdsQuery;
 
-    // collect namespaces and filter by maxDepth if provided
-    const namespaces = items
-      .map((result) =>
-        result.namespace ? utils.mapNamespaceFromCds(result.namespace) : null,
-      )
-      .filter((ns) => ns !== null) as string[][];
+    // map the namespaces from the stringified format to the expected format
+    let namespaces = items
+      .filter((item) => item.namespace !== null)
+      .map((result) => result.namespace as string)
+      .map(utils.mapNamespaceFromCds);
 
     if (maxDepth !== undefined) {
-      return namespaces.filter((ns) => {
-        return ns.length <= maxDepth;
-      });
+      // collect unique namespaces up to maxDepth
+      const namespacesSet = new Set(
+        namespaces.map((ns) => utils.mapNamespaceToCds(ns.slice(0, maxDepth))),
+      );
+      namespaces = [...namespacesSet].map((ns) =>
+        utils.mapNamespaceFromCds(ns),
+      );
     }
+
     return namespaces;
   }
 
