@@ -2,10 +2,10 @@ import {
   StoreItemFields,
   StoreItems,
 } from "#cds-models/plugin/langgraph/persistence";
+import { Embeddings } from "@langchain/core/embeddings";
 import {
   BaseStore,
   GetOperation,
-  IndexConfig,
   Item,
   ListNamespacesOperation,
   Operation,
@@ -15,6 +15,7 @@ import {
   SearchOperation,
 } from "@langchain/langgraph-checkpoint";
 import * as utils from "./utils";
+import cds from "@sap/cds";
 
 export type CdsMemoryStoreConfig = {
   /**
@@ -24,7 +25,13 @@ export type CdsMemoryStoreConfig = {
    * the `StoreItems` entity, isolating store state per graph.
    */
   name: string;
-  index?: IndexConfig;
+  index?: {
+    /**
+     * The embeddings model to use for generating vectors.
+     * This should be a LangChain Embeddings implementation.
+     */
+    embeddings: Embeddings;
+  };
 };
 
 export class CdsMemoryStore extends BaseStore {
@@ -85,9 +92,9 @@ export class CdsMemoryStore extends BaseStore {
         c.namespace;
         c.createdAt;
         c.modifiedAt;
-        c.values((v) => {
-          v.name;
-          v.value;
+        c.fields((f) => {
+          f.name;
+          f.value;
         });
       })
       .where({
@@ -112,9 +119,9 @@ export class CdsMemoryStore extends BaseStore {
         c.namespace;
         c.createdAt;
         c.modifiedAt;
-        c.values((v) => {
-          v.name;
-          v.value;
+        c.fields((f) => {
+          f.name;
+          f.value;
         });
       })
       .where({
@@ -127,16 +134,29 @@ export class CdsMemoryStore extends BaseStore {
     if (filter) {
       const cdsFilter = utils.mapFilterToCds(filter);
       cdsQuery = cdsQuery.where({
-        ...cdsQuery.where,
         ...cdsFilter,
       });
     }
 
     if (query) {
-      // @ts-expect-error: The cdsQuery.search method is not recognized by TypeScript, but it exists in the underlying implementation.
-      cdsQuery = cdsQuery.search({
-        "values.value": query,
-      });
+      // @ts-expect-error: The `expr` function is not recognized by TypeScript, but it is available in the runtime environment.
+      const { expr } = cds.ql;
+
+      if (this.params.index?.embeddings) {
+        const queryEmbedding =
+          await this.params.index.embeddings.embedQuery(query);
+        cdsQuery = cdsQuery.where(
+          expr`cosine_similarity(fields.embedding, ${JSON.stringify(queryEmbedding)}) > 0.75`,
+        );
+      }
+
+      if (cds.requires.db.kind === "hana") {
+        cdsQuery = cdsQuery.where(expr`contains(fields.value, '${query}')`);
+      } else {
+        cdsQuery = cdsQuery.where({
+          "fields.value": { like: `%${query}%` },
+        });
+      }
     }
 
     const items = await cdsQuery;
@@ -155,7 +175,7 @@ export class CdsMemoryStore extends BaseStore {
       utils.mapStoreItemToCds({ key, namespace }, this.graphName),
     );
 
-    const entries = utils.mapStoreItemFieldsToCds(
+    let entries = utils.mapStoreItemFieldsToCds(
       value ?? {},
       namespaceKey,
       key,
@@ -166,7 +186,15 @@ export class CdsMemoryStore extends BaseStore {
       item_namespace: namespaceKey,
       item_id: key,
     });
+
     if (entries.length > 0) {
+      // If embeddings are configured, embed the fields before inserting
+      if (this.params.index?.embeddings) {
+        entries = await utils.embedCdsStoreItemFields(
+          entries,
+          this.params.index.embeddings,
+        );
+      }
       await INSERT.into(StoreItemFields).entries(...entries);
     }
   }
@@ -192,13 +220,11 @@ export class CdsMemoryStore extends BaseStore {
         if (condition.matchType === "prefix") {
           const prefixNamespaces = utils.mapNamespaceToCds(condition.path);
           cdsQuery = cdsQuery.where({
-            ...cdsQuery.where,
             namespace: { like: `${prefixNamespaces}%` },
           });
         } else if (condition.matchType === "suffix") {
           const suffixNamespaces = utils.mapNamespaceToCds(condition.path);
           cdsQuery = cdsQuery.where({
-            ...cdsQuery.where,
             namespace: { like: `%${suffixNamespaces}` },
           });
         }

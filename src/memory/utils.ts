@@ -3,6 +3,7 @@ import {
   StoreItem,
   StoreItemField,
 } from "#cds-models/plugin/langgraph/persistence";
+import { Embeddings } from "@langchain/core/embeddings";
 import { Item } from "@langchain/langgraph-checkpoint";
 
 export function mapNamespaceToCds(namespace: string[]): string {
@@ -14,19 +15,12 @@ export function mapNamespaceFromCds(namespace: string): string[] {
 }
 
 export function mapStoreItemFromCds(storeItem: StoreItem): Item {
-  const values: Record<string, any> =
-    storeItem.values?.reduce((acc: Record<string, any>, field) => {
-      if (field.name && field.value !== null && field.value !== undefined) {
-        acc[field.name] = JSON.parse(field.value);
-      }
-      return acc;
-    }, {}) ?? {};
   return {
     createdAt: new Date(storeItem.createdAt!),
     updatedAt: new Date(storeItem.modifiedAt!),
     namespace: mapNamespaceFromCds(storeItem.namespace!),
     key: storeItem.id!,
-    value: values,
+    value: mapStoreItemFieldsFromCds(storeItem.fields ?? []),
   } as Item;
 }
 
@@ -51,12 +45,23 @@ export function mapStoreItemFieldsToCds(
     ([name, value]) =>
       ({
         name,
-        value: JSON.stringify(value),
+        value: JSON.stringify(value), // store primitive values as JSON strings
         item_graphName: graphName,
         item_namespace: namespaceKey,
         item_id: key,
       }) as StoreItemField,
   );
+}
+
+export function mapStoreItemFieldsFromCds(
+  fields: StoreItemField[],
+): Record<string, any> {
+  return fields.reduce((acc: Record<string, any>, field) => {
+    if (field.name && field.value !== null && field.value !== undefined) {
+      acc[field.name] = JSON.parse(field.value); // parse JSON strings back to their original values
+    }
+    return acc;
+  }, {});
 }
 
 export function mapFilterToCds(
@@ -99,4 +104,35 @@ export function mapFilterToCds(
   }
 
   return cdsFilter;
+}
+
+export async function embedCdsStoreItemFields(
+  storeItemFields: StoreItemField[],
+  embeddings: Embeddings,
+): Promise<StoreItemField[]> {
+  // first collect all the key & value pairs
+  const storeItemFieldMap = storeItemFields.reduce(
+    (acc: Record<string, string>, field) => {
+      if (field.name && field.value) {
+        acc[field.name] = field.value;
+      }
+      return acc;
+    },
+    {},
+  );
+
+  // then embed all the values at once
+  const valuesToEmbed = Object.values(storeItemFieldMap);
+  const embeddedValues = await embeddings.embedDocuments(valuesToEmbed);
+
+  // finally map the embedded values back to the original StoreItemFields
+  return storeItemFields.map((field, index) => {
+    if (field.name && field.value) {
+      return {
+        ...field,
+        embedding: `[${embeddedValues[index]}]`,
+      } as StoreItemField;
+    }
+    return field;
+  });
 }

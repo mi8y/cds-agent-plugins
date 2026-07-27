@@ -30,13 +30,13 @@ entity StoreItems {
     key id         : String(256) not null;
         createdAt  : Timestamp default $now;
         modifiedAt : Timestamp default $now @cds.on.update: $now;
-        values     : Composition of many StoreItemFields
-                         on values.item = $self;
+        fields     : Composition of many StoreItemFields
+                         on fields.item = $self;
 }
 
 entity StoreItemFields {
     key item      : Association to StoreItems;
     key name      : String(256) not null;
         value     : String;
-        embedding : Vector;
+        embedding : Vector(1536); // TODO: Make this configurable based on the embedding model used
 }

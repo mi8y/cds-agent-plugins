@@ -217,21 +217,18 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
 
     if (threadId !== undefined) {
       query = query.where({
-        ...query.where,
         threadId: threadId,
       });
     }
 
     if (checkpointNamespace !== undefined && checkpointNamespace !== null) {
       query = query.where({
-        ...query.where,
         namespace: checkpointNamespace,
       });
     }
 
     if (before?.configurable?.checkpoint_id !== undefined) {
       query = query.where({
-        ...query.where,
         id: { "<": before.configurable.checkpoint_id },
       });
     }
