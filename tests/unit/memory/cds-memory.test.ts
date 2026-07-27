@@ -57,13 +57,13 @@ describe("CdsMemoryStore", () => {
     const result = await store.search(["test"]);
     expect(result).toHaveLength(2);
     expect(result[0]).toMatchObject({
-      value: { value: 1 },
-      key: "123",
+      value: { value: 2 },
+      key: "456",
       namespace: ["test"],
     });
     expect(result[1]).toMatchObject({
-      value: { value: 2 },
-      key: "456",
+      value: { value: 1 },
+      key: "123",
       namespace: ["test"],
     });
   });
