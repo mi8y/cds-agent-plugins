@@ -1,8 +1,9 @@
-import cds from "@sap/cds";
 import {
   CdsCheckpointSaver,
   purgeExpiredCheckpoints,
 } from "@mi8y/cds-langgraph-persistence";
+import cds from "@sap/cds";
+import path from "path";
 
 const NS = "plugin.langgraph.persistence";
 
@@ -40,6 +41,8 @@ async function cleanup() {
 }
 
 describe("CDS Plugin Integration", () => {
+  cds.root = path.join(import.meta.dirname, "../");
+
   // ── CDS Plugin — Model Loading ──────────────────────────────────────
 
   describe("CDS Plugin — Model Loading", () => {

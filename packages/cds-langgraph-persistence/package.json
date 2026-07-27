@@ -73,7 +73,6 @@
   "scripts": {
     "build": "shx rm -rf dist && npm run build:cds-types && vite build",
     "build:cds-types": "node scripts/build-cds-types.mjs",
-    "test": "vitest run --coverage",
     "lint": "eslint . --fix",
     "lint:check": "eslint . --max-warnings 0",
     "clean": "shx rm -rf node_modules dist @cds-models tmp .turbo"
