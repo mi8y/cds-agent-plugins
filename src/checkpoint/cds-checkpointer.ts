@@ -18,6 +18,7 @@ import {
   TASKS,
   WRITES_IDX_MAP,
 } from "@langchain/langgraph-checkpoint";
+import cds from "@sap/cds";
 
 /**
  * Configuration for {@link CdsCheckpointSaver}.
@@ -35,6 +36,23 @@ export type CdsCheckpointSaverConfig = {
    * graph. Use a stable, human-readable value such as `"my-agent"`.
    */
   name: string;
+
+  /**
+   * Time-to-live for checkpoints in milliseconds.
+   *
+   * When set, each checkpoint stored by this saver will receive an `expiresAt`
+   * timestamp (`createdAt + ttl`). A background sweeper (registered via
+   * `cds.spawn()` in the CDS plugin) periodically deletes threads whose
+   * latest checkpoint has expired, provided the thread is not in an
+   * interrupted (human-in-the-loop) state.
+   *
+   * @example
+   * ```ts
+   * // Checkpoints expire after 1 hour of inactivity
+   * const saver = new CdsCheckpointSaver({ name: "my-agent", ttl: 3_600_000 });
+   * ```
+   */
+  ttl?: number;
 };
 
 /**
@@ -65,6 +83,17 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
     super(serde);
     this.config = config;
     this.graphName = config.name;
+  }
+
+  /**
+   * Runs the function in an independent transaction, so cds outboxed consumption won't rollback the checkpointers
+   */
+  async #execWithTx<T = never>(fn: () => Promise<T>): Promise<T> {
+    if (cds.env.requires.db.kind === "sqlite") {
+      // SQLite does not support parallel transactions, so we just run the function directly.
+      return fn();
+    }
+    return cds.tx(async () => fn());
   }
 
   async getTuple(config: RunnableConfig): Promise<CheckpointTuple | undefined> {
@@ -346,24 +375,31 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
       );
     }
 
+    const expiresAt = this.config.ttl
+      ? new Date(Date.now() + this.config.ttl).toISOString()
+      : null;
+
     const valueDecoder = new TextDecoder("utf-8");
-    await UPSERT.into(Checkpoints).entries({
-      graphName: this.graphName,
-      id: checkpoint.id,
-      namespace: checkpointNamespace,
-      threadId: threadId,
-      parent: parentCheckpointId
-        ? {
-            graphName: this.graphName,
-            id: parentCheckpointId,
-            namespace: checkpointNamespace,
-            threadId: threadId,
-          }
-        : null,
-      type: type1,
-      checkpoint: valueDecoder.decode(serializedCheckpoint),
-      metadata: valueDecoder.decode(serializedMetadata),
-    });
+    await this.#execWithTx(async () =>
+      UPSERT.into(Checkpoints).entries({
+        graphName: this.graphName,
+        id: checkpoint.id,
+        namespace: checkpointNamespace,
+        threadId: threadId,
+        parent: parentCheckpointId
+          ? {
+              graphName: this.graphName,
+              id: parentCheckpointId,
+              namespace: checkpointNamespace,
+              threadId: threadId,
+            }
+          : null,
+        type: type1,
+        checkpoint: valueDecoder.decode(serializedCheckpoint),
+        metadata: valueDecoder.decode(serializedMetadata),
+        expiresAt: expiresAt,
+      }),
+    );
 
     return {
       configurable: {
@@ -419,17 +455,21 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
       }),
     );
 
-    await UPSERT.into(CheckpointWrites).entries(pendingWrites);
+    await this.#execWithTx(async () =>
+      UPSERT.into(CheckpointWrites).entries(pendingWrites),
+    );
   }
 
   async deleteThread(threadId: string): Promise<void> {
-    await DELETE.from(CheckpointWrites).where({
-      checkpoint_graphName: this.graphName,
-      checkpoint_threadId: threadId,
-    });
-    await DELETE.from(Checkpoints).where({
-      graphName: this.graphName,
-      threadId: threadId,
+    await this.#execWithTx(async () => {
+      await DELETE.from(CheckpointWrites).where({
+        checkpoint_graphName: this.graphName,
+        checkpoint_threadId: threadId,
+      });
+      await DELETE.from(Checkpoints).where({
+        graphName: this.graphName,
+        threadId: threadId,
+      });
     });
   }
 
