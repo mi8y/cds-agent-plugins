@@ -32,8 +32,10 @@ export function mapStoreItemFromCds(storeItem: StoreItem): Item {
 
 export function mapStoreItemToCds(
   item: Omit<Item, "createdAt" | "updatedAt" | "value">,
+  graphName: string,
 ): StoreItem {
   return {
+    graphName,
     id: item.key,
     namespace: mapNamespaceToCds(item.namespace),
   } as StoreItem;
@@ -43,12 +45,14 @@ export function mapStoreItemFieldsToCds(
   fields: Record<string, any>,
   namespaceKey: string,
   key: string,
+  graphName: string,
 ): StoreItemField[] {
   return Object.entries(fields).map(
     ([name, value]) =>
       ({
         name,
         value: JSON.stringify(value),
+        item_graphName: graphName,
         item_namespace: namespaceKey,
         item_id: key,
       }) as StoreItemField,

@@ -17,15 +17,24 @@ import {
 import * as utils from "./utils";
 
 export type CdsMemoryStoreConfig = {
+  /**
+   * A **required** identifier matching the graph/agent this store belongs to.
+   *
+   * It is persisted as the `graphName` column and used as a composite key in
+   * the `StoreItems` entity, isolating store state per graph.
+   */
+  name: string;
   index?: IndexConfig;
 };
 
 export class CdsMemoryStore extends BaseStore {
   protected params: CdsMemoryStoreConfig;
+  protected graphName: string;
 
-  constructor(params?: CdsMemoryStoreConfig) {
+  constructor(params: CdsMemoryStoreConfig) {
     super();
-    this.params = params ?? {};
+    this.params = params;
+    this.graphName = params.name;
   }
 
   async start(): Promise<void> {}
@@ -82,6 +91,7 @@ export class CdsMemoryStore extends BaseStore {
         });
       })
       .where({
+        graphName: this.graphName,
         namespace: namespaceKey,
         id: key,
       });
@@ -108,6 +118,7 @@ export class CdsMemoryStore extends BaseStore {
         });
       })
       .where({
+        graphName: this.graphName,
         namespace: { like: `${namespacePrefixKey}%` },
       })
       .limit(limit ?? 10, offset ?? 0)
@@ -141,16 +152,17 @@ export class CdsMemoryStore extends BaseStore {
     const namespaceKey = utils.mapNamespaceToCds(namespace);
 
     await UPSERT.into(StoreItems).entries(
-      utils.mapStoreItemToCds({ key, namespace }),
+      utils.mapStoreItemToCds({ key, namespace }, this.graphName),
     );
 
-    // for the values, we need to delete existing fields and insert new ones
     const entries = utils.mapStoreItemFieldsToCds(
       value ?? {},
       namespaceKey,
       key,
+      this.graphName,
     );
     await DELETE.from(StoreItemFields).where({
+      item_graphName: this.graphName,
       item_namespace: namespaceKey,
       item_id: key,
     });
@@ -170,6 +182,7 @@ export class CdsMemoryStore extends BaseStore {
       .columns((c) => {
         c.namespace;
       })
+      .where({ graphName: this.graphName })
       .orderBy("namespace")
       .limit(limit ?? 100, offset ?? 0);
 
@@ -215,6 +228,7 @@ export class CdsMemoryStore extends BaseStore {
   }: GetOperation): Promise<void> {
     const namespaceKey = utils.mapNamespaceToCds(namespace);
     await DELETE.from(StoreItems).where({
+      graphName: this.graphName,
       namespace: namespaceKey,
       id: key,
     });

@@ -34,7 +34,7 @@ describe("CdsMemoryStore", () => {
   });
 
   beforeEach(async () => {
-    store = new CdsMemoryStore();
+    store = new CdsMemoryStore({ name: "test-store" });
     await DELETE.from(StoreItems);
     await DELETE.from(StoreItemFields);
   });

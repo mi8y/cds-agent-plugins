@@ -25,6 +25,7 @@ entity CheckpointWrites {
 }
 
 entity StoreItems {
+    key graphName  : String(256) not null;
     key namespace  : String(256) not null;
     key id         : String(256) not null;
         createdAt  : Timestamp default $now;
