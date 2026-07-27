@@ -152,7 +152,6 @@ jobs:
         shell: bash
         run: |
           cd packages/cds-langgraph-integration-tests
-          pnpm install --frozen-lockfile
           pnpm add @sap/cds@${{ matrix.cap-version[0] }}
           pnpm add -D @cap-js/sqlite@${{ matrix.cap-version[1] }}
           pnpm add -D @cap-js/cds-test@${{ matrix.cap-version[2] }}
@@ -163,6 +162,7 @@ jobs:
         shell: bash
         run: |
           cd packages/cds-langgraph-integration-tests
+          export CDS_ROOT="$GITHUB_WORKSPACE/packages/cds-langgraph-integration-tests"
           pnpm exec cds add langgraph-persistence
 
       - name: Run unit & integration tests
