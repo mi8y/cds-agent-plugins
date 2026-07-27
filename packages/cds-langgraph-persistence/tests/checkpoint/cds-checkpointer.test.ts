@@ -8,13 +8,19 @@ import {
   validate,
 } from "@langchain/langgraph-checkpoint-validation";
 import cds from "@sap/cds";
+import { fileURLToPath } from "url";
 
 export const cdsCheckpointSaverTestInitializer: CheckpointSaverTestInitializer<CdsCheckpointSaver> =
   {
-    checkpointerName: "@langchain/langgraph-checkpoint-cds",
+    checkpointerName: "@mi8y/cds-langgraph-persistence",
 
     async beforeAll() {
-      const csn = await cds.load("index.cds").then(cds.minify);
+      // cds file from @mi8y/langgraph-cds-model package
+      const cdsFilePath = fileURLToPath(
+        import.meta.resolve("@mi8y/cds-langgraph-persistence/index.cds"),
+      );
+
+      const csn = await cds.load(cdsFilePath).then(cds.minify);
       cds.model = cds.compile.for.nodejs(csn);
 
       cds.requires.db = {
@@ -26,7 +32,7 @@ export const cdsCheckpointSaverTestInitializer: CheckpointSaverTestInitializer<C
       cds.db = await cds.connect.to("db");
 
       // @ts-ignore
-      await cds.deploy("index.cds", {}).to(cds.db);
+      await cds.deploy(cdsFilePath, {}).to(cds.db);
     },
 
     async afterAll() {

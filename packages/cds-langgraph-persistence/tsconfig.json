@@ -2,6 +2,7 @@
   "extends": "@tsconfig/recommended",
   "compilerOptions": {
     "rootDir": ".",
+    "module": "esnext",
     "paths": {
       "@/*": ["./src/*"],
       "@sap/cds": ["./node_modules/@cap-js/cds-types"],

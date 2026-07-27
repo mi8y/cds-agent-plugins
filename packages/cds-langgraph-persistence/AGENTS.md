@@ -12,11 +12,11 @@ This project builds a CDS Plugin for SAP CAP applications to build LangGraph/Lan
 │ │ ├── cds-checkpointer.ts
 │ │ └── index.ts
 │ └── memory
-│ ├── cds-memory.ts
-│ └── index.ts
+│ . ├── cds-memory.ts
+│ . └── index.ts
 ├── tests
-│ ├── checkpoint
-│ └── memory
+│ . ├── checkpoint
+│ . └── memory
 └── cds-plugin.js
 
 ## Development

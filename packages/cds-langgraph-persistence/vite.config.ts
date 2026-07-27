@@ -40,13 +40,12 @@ export default defineConfig({
   // Testing Configuration (Vitest)
   test: {
     globals: true,
+    root: import.meta.dirname,
     environment: "node",
     include: ["tests/**/*.test.ts"],
     coverage: {
       provider: "v8",
       exclude: ["@cds-models/"],
-      reporter: ["cobertura"],
-      reportsDirectory: "coverage",
     },
   },
 });
