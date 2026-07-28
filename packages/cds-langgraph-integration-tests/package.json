@@ -8,8 +8,9 @@
     "@mi8y/cds-langgraph-persistence": "workspace:*"
   },
   "scripts": {
-    "test": "vitest --silent",
-    "test:debug": "DEBUG=plugins vitest"
+    "test": "vitest run --silent",
+    "test:debug": "DEBUG=plugins vitest",
+    "start": "sh run.sh"
   },
   "devDependencies": {
     "@cap-js/cds-types": "^0.18.0",

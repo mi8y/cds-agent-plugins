@@ -16,6 +16,8 @@
   "scripts": {
     "build": "turbo run build",
     "test": "vitest run --coverage",
+    "test:unit": "vitest run --coverage --project=\"!packages/cds-langgraph-integration-tests\"",
+    "test:integration": "pnpm --filter @mi8y/cds-langgraph-integration-tests start",
     "lint": "turbo run lint",
     "lint:check": "turbo run lint:check",
     "clean": "turbo run clean && rm -rf node_modules coverage .turbo",

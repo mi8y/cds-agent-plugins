@@ -324,5 +324,3 @@ Any database with a CAP adapter:
 ## License
 
 [MIT License](./LICENSE)
-
-<small>*Usage requires `@sap/cds` under SAP license terms.</small>

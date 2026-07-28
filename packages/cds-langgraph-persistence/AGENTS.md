@@ -1,12 +1,14 @@
 # CDS Persistence Plugin for LangGraph Checkpoint & Memory
 
-This project builds a CDS Plugin for SAP CAP applications to build LangGraph/LangChain/Deep Agents based applications with Checkpoint and Memory persistence. It provides necessary tooling as well as library support for agents built within SAP CAP applications.
+This project builds a CDS Plugin for SAP CAP applications to build LangGraph/LangChain/Deep Agents based applications with Checkpoint and Memory persistence.
 
 ## Project Structure
 
-/
+<root>
 ├── package.json
 ├── AGENTS.md <- You are here
+├── lib
+│. └── add.js // helper lib for CDS plugin
 ├── src
 │ ├── checkpoint
 │ │ ├── cds-checkpointer.ts
@@ -14,21 +16,16 @@ This project builds a CDS Plugin for SAP CAP applications to build LangGraph/Lan
 │ └── memory
 │ . ├── cds-memory.ts
 │ . └── index.ts
-├── tests
+├── tests // unit tests
 │ . ├── checkpoint
 │ . └── memory
-└── cds-plugin.js
+└── cds-plugin.js // CDS plugin entry point
 
-## Development
+## Commands
 
-- Project uses **`pnpm`** as package manager. `npm install -g pnpm` if not already installed.
-- `pnpm install` to install dependencies.
-
-## Testing
-
-- Uses Vitest framework and follows `*.test.ts` naming convention.
-- `pnpm test` to run unit tests
-- `cd tests/integration && sh run.sh` to run integration tests
+- Build: `pnpm build`
+- Test: `pnpm test`
+- Lint: `pnpm lint`
 
 ## Contributing
 
