@@ -1,14 +1,18 @@
-import cds from "@sap/cds";
+import {
+  CheckpointMetadata,
+  PendingWrite,
+} from "@langchain/langgraph-checkpoint";
 import {
   CdsCheckpointSaver,
   purgeExpiredCheckpoints,
 } from "@mi8y/cds-langgraph-persistence";
+import cds from "@sap/cds";
+import path from "path";
+import { beforeEach, describe, it } from "vitest";
 
 const NS = "plugin.langgraph.persistence";
 
-const { expect } = cds.test();
-
-function makeCheckpoint(id) {
+function makeCheckpoint(id: string) {
   return {
     v: 4,
     id,
@@ -19,11 +23,19 @@ function makeCheckpoint(id) {
   };
 }
 
-function makeMetadata(source = "input", step = -1, extra = {}) {
+function makeMetadata(
+  source: CheckpointMetadata["source"] = "input",
+  step = -1,
+  extra = {},
+): CheckpointMetadata {
   return { source, step, parents: {}, ...extra };
 }
 
-function makeConfig(threadId, checkpointNs = "", checkpointId) {
+function makeConfig(
+  threadId: string,
+  checkpointNs = "",
+  checkpointId?: string,
+) {
   return {
     configurable: {
       thread_id: threadId,
@@ -40,6 +52,9 @@ async function cleanup() {
 }
 
 describe("CDS Plugin Integration", () => {
+  cds.root = path.join(import.meta.dirname, "../");
+  const { expect } = cds.test("@mi8y/cds-langgraph-integration-tests");
+
   // ── CDS Plugin — Model Loading ──────────────────────────────────────
 
   describe("CDS Plugin — Model Loading", () => {
@@ -110,7 +125,7 @@ describe("CDS Plugin Integration", () => {
 
       await saver.put(config, makeCheckpoint(cpId), makeMetadata(), {});
 
-      const writes = [
+      const writes: PendingWrite[] = [
         ["channel-a", { data: "hello" }],
         ["channel-b", { data: "world" }],
       ];
@@ -118,11 +133,14 @@ describe("CDS Plugin Integration", () => {
 
       const rows = await SELECT.from(CheckpointWrites);
       expect(rows).to.have.lengthOf(2);
-      expect(rows.map((r) => r.channel)).to.have.members([
+      expect(rows.map((r: { channel: string }) => r.channel)).to.have.members([
         "channel-a",
         "channel-b",
       ]);
-      expect(rows.map((r) => r.taskId)).to.eql(["task-1", "task-1"]);
+      expect(rows.map((r: { taskId: string }) => r.taskId)).to.eql([
+        "task-1",
+        "task-1",
+      ]);
     });
 
     it("writes should reference their parent checkpoint via composition", async () => {
@@ -146,7 +164,7 @@ describe("CDS Plugin Integration", () => {
         .from(Checkpoints)
         .columns((c) => {
           c.id;
-          c.writes((w) => {
+          c.writes((w: { channel: string; taskId: string; idx: number }) => {
             w.channel;
             w.taskId;
             w.idx;
@@ -155,10 +173,9 @@ describe("CDS Plugin Integration", () => {
         .where({ graphName: "test", id: cpId });
 
       expect(result.writes).to.have.lengthOf(2);
-      expect(result.writes.map((w) => w.channel)).to.have.members([
-        "ch-1",
-        "ch-2",
-      ]);
+      expect(
+        result.writes.map((w: { channel: string }) => w.channel),
+      ).to.have.members(["ch-1", "ch-2"]);
       expect(result.writes[0].taskId).to.equal("task-comp");
     });
   });
@@ -190,11 +207,12 @@ describe("CDS Plugin Integration", () => {
       const result = await saver.getTuple(makeConfig(threadId));
 
       expect(result).to.exist;
-      expect(result.checkpoint.id).to.equal(cpId);
-      expect(result.config.configurable.thread_id).to.equal(threadId);
-      expect(result.metadata.source).to.equal("loop");
-      expect(result.metadata.step).to.equal(0);
-      expect(result.metadata.custom).to.equal("raw-test");
+      expect(result?.checkpoint.id).to.equal(cpId);
+      expect(result?.config?.configurable?.thread_id).to.equal(threadId);
+      expect(result?.metadata?.source).to.equal("loop");
+      expect(result?.metadata?.step).to.equal(0);
+      // @ts-expect-error custom meta
+      expect(result?.metadata?.custom).to.equal("raw-test");
     });
 
     it("list() should list checkpoints inserted via raw CQL", async () => {
@@ -297,11 +315,12 @@ describe("CDS Plugin Integration", () => {
 
       const result = await saver.getTuple(config);
       expect(result).to.exist;
-      expect(result.checkpoint.id).to.equal(cpId);
-      expect(result.metadata.source).to.equal("loop");
-      expect(result.metadata.custom).to.equal("persistence");
-      expect(result.pendingWrites).to.have.lengthOf(1);
-      expect(result.pendingWrites[0][2]).to.deep.equal({ persisted: true });
+      expect(result?.checkpoint.id).to.equal(cpId);
+      expect(result?.metadata?.source).to.equal("loop");
+      // @ts-expect-error custom meta
+      expect(result?.metadata?.custom).to.equal("persistence");
+      expect(result?.pendingWrites).to.have.lengthOf(1);
+      expect(result?.pendingWrites?.[0][2]).to.deep.equal({ persisted: true });
 
       // Cross-verify via raw CQL from the fresh instance's era
       const { Checkpoints } = cds.entities(NS);
@@ -336,12 +355,14 @@ describe("CDS Plugin Integration", () => {
       const saverB = new CdsCheckpointSaver({ name: "test" });
 
       const resultA = await saverB.getTuple(makeConfig(threadA));
-      expect(resultA.checkpoint.id).to.equal(cpA);
-      expect(resultA.metadata.owner).to.equal("A");
+      expect(resultA?.checkpoint.id).to.equal(cpA);
+      // @ts-expect-error custom meta
+      expect(resultA?.metadata?.owner).to.equal("A");
 
       const resultB = await saverB.getTuple(makeConfig(threadB));
-      expect(resultB.checkpoint.id).to.equal(cpB);
-      expect(resultB.metadata.owner).to.equal("B");
+      expect(resultB?.checkpoint.id).to.equal(cpB);
+      // @ts-expect-error custom meta
+      expect(resultB?.metadata?.owner).to.equal("B");
     });
   });
 
@@ -370,10 +391,12 @@ describe("CDS Plugin Integration", () => {
       );
 
       const resultA = await saver.getTuple(makeConfig(threadId, nsA));
-      expect(resultA.metadata.ns).to.equal("alpha");
+      // @ts-expect-error custom meta
+      expect(resultA?.metadata?.ns).to.equal("alpha");
 
       const resultB = await saver.getTuple(makeConfig(threadId, nsB));
-      expect(resultB.metadata.ns).to.equal("beta");
+      // @ts-expect-error custom meta
+      expect(resultB?.metadata?.ns).to.equal("beta");
     });
   });
 
@@ -687,7 +710,8 @@ describe("CDS Plugin Integration", () => {
           throw new Error("Simulated outbox rollback");
         });
       } catch (e) {
-        expect(e.message).to.equal("Simulated outbox rollback");
+        const err = e as Error;
+        expect(err.message).to.equal("Simulated outbox rollback");
       }
 
       const rows = await SELECT.from(Checkpoints).where({ id: cpId });
@@ -709,7 +733,7 @@ describe("CDS Plugin Integration", () => {
 
       await saver.put(config, makeCheckpoint(cpId), makeMetadata(), {});
 
-      const writes = [
+      const writes: PendingWrite[] = [
         ["channel-a", { data: "hello-tx" }],
         ["channel-b", { data: "world-tx" }],
       ];
@@ -720,15 +744,19 @@ describe("CDS Plugin Integration", () => {
           throw new Error("Simulated outbox rollback");
         });
       } catch (e) {
-        expect(e.message).to.equal("Simulated outbox rollback");
+        const err = e as Error;
+        expect(err.message).to.equal("Simulated outbox rollback");
       }
 
       const rows = await SELECT.from(CheckpointWrites).where({
         checkpoint_id: cpId,
       });
       expect(rows).to.have.lengthOf(2);
-      expect(rows.map((r) => r.taskId)).to.eql(["task-tx-iso", "task-tx-iso"]);
-      expect(rows.map((r) => r.channel)).to.have.members([
+      expect(rows.map((r: { taskId: string }) => r.taskId)).to.eql([
+        "task-tx-iso",
+        "task-tx-iso",
+      ]);
+      expect(rows.map((r: { channel: string }) => r.channel)).to.have.members([
         "channel-a",
         "channel-b",
       ]);
@@ -766,7 +794,8 @@ describe("CDS Plugin Integration", () => {
           throw new Error("Simulated outbox rollback");
         });
       } catch (e) {
-        expect(e.message).to.equal("Simulated outbox rollback");
+        const err = e as Error;
+        expect(err.message).to.equal("Simulated outbox rollback");
       }
 
       const remainingCps = await SELECT.from(Checkpoints);
@@ -801,7 +830,8 @@ describe("CDS Plugin Integration", () => {
           throw new Error("Simulated outbox rollback");
         });
       } catch (e) {
-        expect(e.message).to.equal("Simulated outbox rollback");
+        const err = e as Error;
+        expect(err.message).to.equal("Simulated outbox rollback");
       }
 
       const rows = await SELECT.from(Checkpoints)

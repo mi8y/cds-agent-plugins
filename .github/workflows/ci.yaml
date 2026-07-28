@@ -21,7 +21,7 @@ jobs:
   # Static checks + Build (all run in parallel)
   # ===========================================
   lint:
-    name: check linting
+    name: lint
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -45,7 +45,7 @@ jobs:
         run: pnpm lint:check
 
   format:
-    name: check formatting
+    name: format
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -93,7 +93,7 @@ jobs:
         run: pnpm build
 
       - name: Create build archive
-        run: tar -czf build-artifacts.tar.gz ./dist ./@cds-models
+        run: tar -czf build-artifacts.tar.gz ./packages/cds-langgraph-persistence/dist ./packages/cds-langgraph-persistence/@cds-models
 
       - name: Publish to pkg.pr.new
         if: ${{ github.event_name == 'pull_request' }}
@@ -108,19 +108,22 @@ jobs:
           retention-days: 1
 
   # ============================================
-  # Stage 2: Unit Tests
+  # Stage 2: Unit & Integration Tests
   # ============================================
-  unit-tests:
-    name: unit tests
+  tests:
+    name: unit & integration tests
     needs: [lint, format, build]
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      code-quality: write
-      pull-requests: read
     strategy:
       matrix:
         node-version: [24]
+        cap-version: [
+            # [ @sap/cds, @cap-js/sqlite, @cap-js/cds-test ]
+            # [9, 2, 1],
+            [10, 3, 1],
+          ]
     steps:
       - uses: actions/checkout@v7
 
@@ -145,8 +148,25 @@ jobs:
         run: tar -xzf build-artifacts.tar.gz
         shell: bash
 
-      - name: Test
-        run: pnpm test
+      - name: "Integration tests: Install test dependencies"
+        shell: bash
+        run: |
+          cd packages/cds-langgraph-integration-tests
+          pnpm add @sap/cds@${{ matrix.cap-version[0] }}
+          pnpm add -D @cap-js/sqlite@${{ matrix.cap-version[1] }} @cap-js/cds-test@${{ matrix.cap-version[2] }} @sap/cds-dk@${{ matrix.cap-version[0] }}
+          pnpm exec cds version --info
+
+      - name: "Integration tests:Run 'cds add langgraph-persistence' command"
+        shell: bash
+        run: |
+          cd packages/cds-langgraph-integration-tests
+          export CDS_ROOT="$GITHUB_WORKSPACE/packages/cds-langgraph-integration-tests"
+          pnpm exec cds add langgraph-persistence
+
+      - name: Run unit & integration tests
+        shell: bash
+        run: |
+          pnpm test
 
       # - name: Upload coverage report
       #   if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -155,69 +175,3 @@ jobs:
       #     file: coverage/cobertura-coverage.xml
       #     language: JavaScript
       #     label: coverage
-
-  # ============================================
-  # Stage 3: Integration Tests
-  # ============================================
-  integration-tests:
-    name: integration tests
-    needs: [lint, format, build]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      matrix:
-        node-version: [24]
-        cap-version: [
-            # [ @sap/cds, @cap-js/sqlite, @cap-js/cds-test ]
-            [9, 2, 1],
-            [10, 3, 1],
-          ]
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: "pnpm"
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: build-artifacts
-
-      - name: Extract build artifacts
-        run: tar -xzf build-artifacts.tar.gz
-        shell: bash
-
-      - name: Install test dependencies
-        shell: bash
-        run: |
-          cd tests/integration
-          pnpm install --frozen-lockfile
-          pnpm add @sap/cds@${{ matrix.cap-version[0] }}
-          pnpm add -D @cap-js/sqlite@${{ matrix.cap-version[1] }}
-          pnpm add -D @cap-js/cds-test@${{ matrix.cap-version[2] }}
-          pnpm add -D @sap/cds-dk@${{ matrix.cap-version[0] }}
-
-      - name: CDS Info
-        shell: bash
-        run: |
-          cd tests/integration
-          pnpm exec cds version --info
-
-      - name: Run 'cds add langgraph-persistence' command
-        shell: bash
-        run: |
-          cd tests/integration
-          pnpm exec cds add langgraph-persistence
-
-      - name: Run integration tests
-        shell: bash
-        run: |
-          cd tests/integration
-          pnpm test
