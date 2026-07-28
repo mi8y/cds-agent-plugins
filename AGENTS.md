@@ -1,34 +1,47 @@
-# CDS Persistence Plugin for LangGraph Checkpoint & Memory
+# CAP CDS Plugin for building LangGraph/LangChain/Deep Agents within CAP framework
 
-This project builds a CDS Plugin for SAP CAP applications to build LangGraph/LangChain/Deep Agents based applications with Checkpoint and Memory persistence. It provides necessary tooling as well as library support for agents built within SAP CAP applications.
+This is a turbo-based monorepo containing CDS plugins for building production-ready LangGraph/LangChain/Deep Agents within SAP CAP framework.
 
 ## Project Structure
 
-/
-├── package.json
+<root>
 ├── AGENTS.md <- You are here
-├── src
-│ ├── checkpoint
-│ │ ├── cds-checkpointer.ts
-│ │ └── index.ts
-│ └── memory
-│ ├── cds-memory.ts
-│ └── index.ts
+├── package.json
+├── packages
+│ . ├── cds-langgraph-integration-tests
+│ . │ . ├── AGENTS.md <- Read this for integration test setup
+│ . │ . └── ...
+│ . ├── cds-langgraph-persistence
+│ . │ . ├── AGENTS.md <- Read this for persistence plugin (checkpoint & memory) setup
+│ . │ . └── ...
+│ . ├── cds-langgraph-vectorstore
+│ . │ . ├── AGENTS.md <- Read this for vectorstore plugin setup
+│ . │ . └── ...
+│ . └── cds-langgraph-telemetry
+│ . . ├── AGENTS.md <- Read this for telemetry plugin setup
+│ . . └── ...
+├── examples
+│ . └── ...
 ├── tests
-│ ├── checkpoint
-│ └── memory
+│ . ├── checkpoint
+│ . └── memory
 └── cds-plugin.js
 
 ## Development
 
-- Project uses **`pnpm`** as package manager. `npm install -g pnpm` if not already installed.
-- `pnpm install` to install dependencies.
+- **`pnpm`** package manager. `npm install -g pnpm` if not already installed.
+- Install - `pnpm install`
+- Build - `pnpm build`
+- Format - `pnpm format`
+- Lint - `pnpm lint`
+- Clean - `pnpm clean`
 
 ## Testing
 
 - Uses Vitest framework and follows `*.test.ts` naming convention.
-- `pnpm test` to run unit tests
-- `cd tests/integration && sh run.sh` to run integration tests
+- Unit Test - `pnpm test:unit`
+- Integration Test - `pnpm test:integration`
+- Do not run `pnpm test` as it is meant for CI workflow
 
 ## Contributing
 

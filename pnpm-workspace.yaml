@@ -1,7 +1,8 @@
 allowBuilds:
+  better-sqlite3: true
   tree-sitter: true
   tree-sitter-java: false
 
 packages:
-  - "."
   - "examples/*"
+  - "packages/*"

@@ -89,7 +89,7 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
    * Runs the function in an independent transaction, so cds outboxed consumption won't rollback the checkpointers
    */
   async #execWithTx<T = never>(fn: () => Promise<T>): Promise<T> {
-    if (cds.env.requires.db.kind === "sqlite") {
+    if (cds.requires.db.kind === "sqlite") {
       // SQLite does not support parallel transactions, so we just run the function directly.
       return fn();
     }

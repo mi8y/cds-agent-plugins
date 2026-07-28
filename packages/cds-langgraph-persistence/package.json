@@ -1,0 +1,91 @@
+{
+  "name": "@mi8y/cds-langgraph-persistence",
+  "version": "0.6.0",
+  "description": "CDS Plugin for enabling persistence in LangGraph/LangChain/DeepAgents - Checkpoint & Memory",
+  "author": "Merbin J Anselm <merbin.j.anselm@mi8y.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mi8y/cds-langgraph-plugins.git"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/mi8y/cds-langgraph-plugins",
+  "bugs": {
+    "url": "https://github.com/mi8y/cds-langgraph-plugins/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./cds-plugin": "./cds-plugin.js",
+    "./index.cds": "./index.cds"
+  },
+  "files": [
+    "dist/**/*",
+    "index.cds",
+    "cds-plugin.js",
+    "lib/",
+    "LICENSE",
+    "package.json",
+    "README.md"
+  ],
+  "keywords": [
+    "sap",
+    "cap",
+    "cds",
+    "agent",
+    "langgraph",
+    "langchain",
+    "deepagents",
+    "checkpointer"
+  ],
+  "dependencies": {
+    "@langchain/langgraph-checkpoint": "^1.1.3"
+  },
+  "devDependencies": {
+    "@cap-js/cds-typer": "^0.40.0",
+    "@cap-js/cds-types": "^0.18.0",
+    "@cap-js/sqlite": "^3.0.2",
+    "@eslint/js": "^10.0.1",
+    "@langchain/core": "^1.2.1",
+    "@langchain/langgraph-checkpoint-validation": "^1.1.0",
+    "@sap/cds": ">=9",
+    "@sap/eslint-plugin-cds": "^4.2.4",
+    "@tsconfig/recommended": "^1.0.13",
+    "@typescript/typescript6": "^6.0.2",
+    "eslint": "^10.6.0",
+    "shelljs": "^0.10.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0"
+  },
+  "peerDependencies": {
+    "@sap/cds": ">=9"
+  },
+  "peerDependenciesMeta": {
+    "@sap/cds": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "shx rm -rf dist && npm run build:cds-types && vite build",
+    "build:cds-types": "node scripts/build-cds-types.mjs",
+    "test": "vitest run --coverage",
+    "lint": "eslint . --fix",
+    "lint:check": "eslint . --max-warnings 0",
+    "clean": "shx rm -rf node_modules dist @cds-models tmp .turbo"
+  },
+  "packageManager": "pnpm@11.11.0",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "cds": {
+    "requires": {
+      "cds-langgraph-persistence": {}
+    }
+  }
+}

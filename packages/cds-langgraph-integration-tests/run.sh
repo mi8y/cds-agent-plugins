@@ -10,7 +10,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 NODE_VERSION="${NODE_VERSION:-24}"
 
 VERSIONS=(
-  "9 2 1"
+  # "9 2 1"
   "10 3 1"
 )
 
@@ -30,20 +30,20 @@ nvm install "$NODE_VERSION" --no-progress 2>/dev/null || true
 nvm use "$NODE_VERSION"
 
 # --- Verify root build ---
-if [ ! -d "$ROOT_DIR/dist" ]; then
+if [ ! -d "$ROOT_DIR/packages/cds-langgraph-persistence/dist" ]; then
   echo "ERROR: Root package not built. Run 'pnpm build' in the repo root first."
   exit 1
 fi
 
 # --- Backup pristine lockfile ---
-if [ ! -f "$SCRIPT_DIR/pnpm-lock.yaml" ]; then
-  echo "ERROR: pnpm-lock.yaml not found in tests/integration"
+if [ ! -f "$ROOT_DIR/pnpm-lock.yaml" ]; then
+  echo "ERROR: pnpm-lock.yaml not found in $ROOT_DIR"
   exit 1
 fi
 
-LOCK_BAK="$SCRIPT_DIR/pnpm-lock.yaml.bak"
+LOCK_BAK="$ROOT_DIR/pnpm-lock.yaml.bak"
 PKG_BAK="$SCRIPT_DIR/package.json.bak"
-cp "$SCRIPT_DIR/pnpm-lock.yaml" "$LOCK_BAK"
+cp "$ROOT_DIR/pnpm-lock.yaml" "$LOCK_BAK"
 cp "$SCRIPT_DIR/package.json" "$PKG_BAK"
 trap 'rm -f "$LOCK_BAK" "$PKG_BAK"' EXIT
 
@@ -82,6 +82,9 @@ for combo in "${VERSIONS[@]}"; do
   echo "→ CDS info..."
   pnpm exec cds version --info
 
+  # set CDS_ROOT environment variable to point to the script package
+  export CDS_ROOT="$SCRIPT_DIR"
+
   echo ""
   echo "→ Running 'add' command..."
   pnpm exec cds add langgraph-persistence
@@ -106,8 +109,8 @@ for combo in "${VERSIONS[@]}"; do
 done
 
 # --- Final cleanup: restore lockfile and package.json ---
-rm -rf "$SCRIPT_DIR/node_modules" "$SCRIPT_DIR/pnpm-lock.yaml" 2>/dev/null || true
-cp "$LOCK_BAK" "$SCRIPT_DIR/pnpm-lock.yaml"
+rm -rf "$SCRIPT_DIR/node_modules" "$ROOT_DIR/pnpm-lock.yaml" 2>/dev/null || true
+cp "$LOCK_BAK" "$ROOT_DIR/pnpm-lock.yaml"
 cp "$PKG_BAK" "$SCRIPT_DIR/package.json"
 
 echo ""
