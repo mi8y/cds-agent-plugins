@@ -63,6 +63,19 @@ importers:
       '@mi8y/cds-langgraph-persistence':
         specifier: workspace:*
         version: link:../cds-langgraph-persistence
+    devDependencies:
+      '@cap-js/cds-types':
+        specifier: ^0.18.0
+        version: 0.18.0(@sap/cds-dk@10.0.5)(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6)
+      '@langchain/langgraph-checkpoint':
+        specifier: ^1.1.3
+        version: 1.1.3(@langchain/core@1.2.2)
+      '@tsconfig/recommended':
+        specifier: ^1.0.13
+        version: 1.0.13
+      '@types/node':
+        specifier: ^26.1.1
+        version: 26.1.1
 
   packages/cds-langgraph-persistence:
     dependencies:
@@ -72,10 +85,10 @@ importers:
     devDependencies:
       '@cap-js/cds-typer':
         specifier: ^0.40.0
-        version: 0.40.0(@cap-js/cds-types@0.18.0(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6))(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))
+        version: 0.40.0(@cap-js/cds-types@0.18.0(@sap/cds-dk@10.0.5)(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6))(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))
       '@cap-js/cds-types':
         specifier: ^0.18.0
-        version: 0.18.0(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6)
+        version: 0.18.0(@sap/cds-dk@10.0.5)(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6)
       '@cap-js/sqlite':
         specifier: ^3.0.2
         version: 3.0.2(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))
@@ -556,6 +569,118 @@ packages:
     resolution: {integrity: sha512-Qwk9jitwSSwPB9FTB/Q6gYPxFsJxswhfsO9Ux77HTxjIhse8O/Hlq2XzkpVSTyaAVr8Lo7wLfpytHwKQScZTwQ==}
     engines: {node: '>=22'}
     hasBin: true
+
+  '@sap/cds-dk@10.0.5':
+    resolution: {integrity: sha512-jbh5lK3oSwA6xzqxQeZbKkphzV0i57HutIo2friTuolS2QYHX9WOaVAZySqovoPmT8acQtqj5ki7/nuJepGBRA==}
+    hasBin: true
+    bundledDependencies:
+      - '@cap-js/asyncapi'
+      - '@cap-js/db-service'
+      - '@cap-js/openapi'
+      - '@cap-js/sqlite'
+      - '@eslint/js'
+      - '@sap/cds'
+      - '@sap/cds-compiler'
+      - '@sap/cds-fiori'
+      - '@sap/cds-mtxs'
+      - '@sap/hdi'
+      - '@sap/hdi-deploy'
+      - '@sap/xsenv'
+      - accepts
+      - assert-plus
+      - async
+      - body-parser
+      - braces
+      - bytes
+      - call-bind-apply-helpers
+      - call-bound
+      - clone
+      - content-disposition
+      - content-type
+      - cookie
+      - cookie-signature
+      - core-util-is
+      - debug
+      - depd
+      - dotenv
+      - dunder-proto
+      - ee-first
+      - encodeurl
+      - es-define-property
+      - es-errors
+      - es-object-atoms
+      - escape-html
+      - etag
+      - express
+      - extsprintf
+      - fill-range
+      - finalhandler
+      - forwarded
+      - fresh
+      - function-bind
+      - get-intrinsic
+      - get-proto
+      - gopd
+      - handlebars
+      - has-symbols
+      - hasown
+      - hdb
+      - http-errors
+      - iconv-lite
+      - inherits
+      - ipaddr.js
+      - is-number
+      - is-promise
+      - livereload-js
+      - lz4-wasm-nodejs
+      - math-intrinsics
+      - media-typer
+      - merge-descriptors
+      - micromatch
+      - mime-db
+      - mime-types
+      - minimist
+      - ms
+      - mustache
+      - negotiator
+      - neo-async
+      - node-cache
+      - object-inspect
+      - on-finished
+      - once
+      - parseurl
+      - path-to-regexp
+      - picomatch
+      - pluralize
+      - proxy-addr
+      - qs
+      - range-parser
+      - raw-body
+      - router
+      - safer-buffer
+      - sax
+      - semver
+      - send
+      - serve-static
+      - setprototypeof
+      - side-channel
+      - side-channel-list
+      - side-channel-map
+      - side-channel-weakmap
+      - source-map
+      - statuses
+      - to-regex-range
+      - toidentifier
+      - type-is
+      - uglify-js
+      - unpipe
+      - vary
+      - verror
+      - wordwrap
+      - wrappy
+      - ws
+      - xml-js
+      - yaml
 
   '@sap/cds-fiori@2.3.0':
     resolution: {integrity: sha512-6oWov+DSpFrSTgxXR0dZhak6aZ/IVRZvaHERMi0EgSTzIJdlvZlpw3Kf18ePMcTrRrtEXwD4RIjKt8pbs0g2Hg==}
@@ -2559,15 +2684,17 @@ snapshots:
 
   '@bcoe/v8-coverage@1.0.2': {}
 
-  '@cap-js/cds-typer@0.40.0(@cap-js/cds-types@0.18.0(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6))(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))':
+  '@cap-js/cds-typer@0.40.0(@cap-js/cds-types@0.18.0(@sap/cds-dk@10.0.5)(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6))(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))':
     dependencies:
-      '@cap-js/cds-types': 0.18.0(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6)
+      '@cap-js/cds-types': 0.18.0(@sap/cds-dk@10.0.5)(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6)
       '@sap/cds': 10.0.3(@eslint/js@10.0.1(eslint@10.6.0))
 
-  '@cap-js/cds-types@0.18.0(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6)':
+  '@cap-js/cds-types@0.18.0(@sap/cds-dk@10.0.5)(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))(@types/express@5.0.6)':
     dependencies:
       '@sap/cds': 10.0.3(@eslint/js@10.0.1(eslint@10.6.0))
       '@types/express': 5.0.6
+    optionalDependencies:
+      '@sap/cds-dk': 10.0.5
 
   '@cap-js/db-service@3.0.1(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))':
     dependencies:
@@ -3105,6 +3232,9 @@ snapshots:
       - supports-color
 
   '@sap/cds-compiler@7.0.1': {}
+
+  '@sap/cds-dk@10.0.5':
+    optional: true
 
   '@sap/cds-fiori@2.3.0(@sap/cds@10.0.3(@eslint/js@10.0.1(eslint@10.6.0)))':
     dependencies:
