@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   DocumentMetadata_ as CdsDocumentMetadata,
   Documents as CdsDocuments,
