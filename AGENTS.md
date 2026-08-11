@@ -14,10 +14,10 @@ This is a turbo-based monorepo containing CDS plugins for building production-re
 │ . ├── cds-langgraph-persistence
 │ . │ . ├── AGENTS.md <- Read this for persistence plugin (checkpoint & memory) setup
 │ . │ . └── ...
-│ . ├── cds-langgraph-vectorstore
+│ . ├── cds-langchain-vectorstore
 │ . │ . ├── AGENTS.md <- Read this for vectorstore plugin setup
 │ . │ . └── ...
-│ . └── cds-langgraph-telemetry
+│ . └── cds-langchain-telemetry
 │ . . ├── AGENTS.md <- Read this for telemetry plugin setup
 │ . . └── ...
 ├── examples
