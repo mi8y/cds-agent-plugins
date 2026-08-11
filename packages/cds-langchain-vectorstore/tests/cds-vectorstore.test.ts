@@ -1,10 +1,8 @@
-import { DocumentInterface } from "@langchain/core/documents";
 import { Embeddings } from "@langchain/core/embeddings";
 import { SyntheticEmbeddings } from "@langchain/core/utils/testing";
 import cds from "@sap/cds";
 import { fileURLToPath } from "url";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
-
 import {
   DocumentMetadata_,
   Documents,

@@ -1,15 +1,15 @@
 {
-  "name": "@mi8y/cds-langgraph-plugins",
+  "name": "@mi8y/cds-agent-plugins",
   "description": "SAP CDS LangGraph Plugins",
   "author": "Merbin J Anselm <merbin.j.anselm@mi8y.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mi8y/cds-langgraph-plugins.git"
+    "url": "git+https://github.com/mi8y/cds-agent-plugins.git"
   },
   "license": "MIT",
-  "homepage": "https://github.com/mi8y/cds-langgraph-plugins",
+  "homepage": "https://github.com/mi8y/cds-agent-plugins",
   "bugs": {
-    "url": "https://github.com/mi8y/cds-langgraph-plugins/issues"
+    "url": "https://github.com/mi8y/cds-agent-plugins/issues"
   },
   "private": true,
   "packageManager": "pnpm@11.11.0",
