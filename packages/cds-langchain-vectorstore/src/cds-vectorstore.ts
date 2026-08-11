@@ -1,8 +1,3 @@
-import {
-  DocumentMetadata_ as CdsDocumentMetadata,
-  Documents as CdsDocuments,
-  Document as CdsDocument,
-} from "#cds-models/plugin/langchain/vectorstore";
 import { Document, DocumentInterface } from "@langchain/core/documents";
 import type { EmbeddingsInterface } from "@langchain/core/embeddings";
 import { maximalMarginalRelevance } from "@langchain/core/utils/math";
@@ -15,22 +10,39 @@ import * as utils from "./utils";
 
 const LOG = cds.log("cds-langchain-vectorstore");
 
+const DEFAULT_DOCUMENTS_ENTITY = "plugin.langchain.vectorstore.Documents";
+const DEFAULT_DOCUMENT_METADATA_ENTITY =
+  "plugin.langchain.vectorstore.DocumentMetadata";
+
 export type CdsVectorStoreConfig = {
   name: string;
   threshold?: number;
+  fqnDocumentsEntity?: string;
+  fqnDocumentMetadataEntity?: string;
 };
 
 export class CDSVectorStore extends VectorStore {
   declare FilterType: utils.MetadataFilter;
 
+  // Name of the vector store - used to differentiate between multiple vector stores in the same table
   #storeName: string;
 
   #searchThreshold: number;
+
+  // Fully qualified name of the vector document entity
+  #fqnVectorDocument: string;
+
+  // Fully qualified name of the vector document metadata entity
+  #fqnVectorDocumentMetadata: string;
 
   constructor(embeddings: EmbeddingsInterface, config: CdsVectorStoreConfig) {
     super(embeddings, config);
     this.#storeName = config.name;
     this.#searchThreshold = config.threshold ?? 0.75;
+    this.#fqnVectorDocument =
+      config.fqnDocumentsEntity ?? DEFAULT_DOCUMENTS_ENTITY;
+    this.#fqnVectorDocumentMetadata =
+      config.fqnDocumentMetadataEntity ?? DEFAULT_DOCUMENT_METADATA_ENTITY;
   }
 
   _vectorstoreType(): string {
@@ -51,18 +63,18 @@ export class CDSVectorStore extends VectorStore {
     const documentIds = cdsDocuments.map((doc) => doc.id as string);
 
     // first delete any existing document metadata
-    await DELETE.from(CdsDocumentMetadata).where({
+    await DELETE.from(this.#fqnVectorDocumentMetadata).where({
       document_storeName: this.#storeName,
       document_id: { in: documentIds },
     });
 
     // then update/insert the documents
-    await UPSERT.into(CdsDocuments).entries(cdsDocuments);
+    await UPSERT.into(this.#fqnVectorDocument).entries(cdsDocuments);
 
     // explicitly insert the composition metadata
     const allMetadata = cdsDocuments.flatMap((doc) => doc.metadata ?? []);
     if (allMetadata.length > 0) {
-      await INSERT.into(CdsDocumentMetadata).entries(allMetadata);
+      await INSERT.into(this.#fqnVectorDocumentMetadata).entries(allMetadata);
     }
 
     LOG.debug(
@@ -83,7 +95,9 @@ export class CDSVectorStore extends VectorStore {
   async delete(params?: { documentIds: string[] }): Promise<void> {
     const { documentIds } = params ?? {};
 
-    let query = DELETE.from(CdsDocuments).where({ storeName: this.#storeName });
+    let query = DELETE.from(this.#fqnVectorDocument).where({
+      storeName: this.#storeName,
+    });
 
     // If documentIds are provided, add a condition to delete only those documents
     if (documentIds) {
@@ -104,7 +118,7 @@ export class CDSVectorStore extends VectorStore {
     embedding: number[],
     k: number,
     filter?: this["FilterType"],
-  ): Promise<{ document: CdsDocument; similarity: number }[]> {
+  ): Promise<{ document: utils.VectorDocumentAsEntity; similarity: number }[]> {
     // @ts-expect-error: The `expr` function is not recognized by TypeScript, but it is available in the runtime environment.
     const { expand, expr, ref, columns } = cds.ql;
 
@@ -114,7 +128,7 @@ export class CDSVectorStore extends VectorStore {
       embeddingStr = `to_real_vector(${embeddingStr})`;
     }
 
-    let query = SELECT.from(CdsDocuments)
+    let query = SELECT.from(this.#fqnVectorDocument)
       .columns([
         "storeName",
         "id",
@@ -139,12 +153,20 @@ export class CDSVectorStore extends VectorStore {
     }
 
     return res
-      .map((cdsDoc) => ({
-        document: cdsDoc,
-        // @ts-expect-error alias property added during runtime
-        similarity: cdsDoc["cosine_similarity"],
-      }))
-      .sort((a, b) => b.similarity - a.similarity);
+      .map(
+        (
+          cdsDoc: utils.VectorDocumentAsEntity & { cosine_similarity?: number },
+        ) => ({
+          document: cdsDoc,
+          similarity: cdsDoc["cosine_similarity"] ?? 0,
+        }),
+      )
+      .sort(
+        (
+          a: { document: utils.VectorDocumentAsEntity; similarity: number },
+          b: { document: utils.VectorDocumentAsEntity; similarity: number },
+        ) => b.similarity - a.similarity,
+      );
   }
 
   async similaritySearchVectorWithScore(

@@ -1,9 +1,10 @@
+import type { VectorDocument, VectorDocumentMetadata } from "#cds-models/index";
 import { DocumentInterface } from "@langchain/core/documents";
-import {
-  DocumentMetadata,
-  Document,
-} from "#cds-models/plugin/langchain/vectorstore";
 import cds from "@sap/cds";
+
+export type VectorDocumentAsEntity = VectorDocument & {
+  metadata: VectorDocumentMetadata[];
+};
 
 export function serializeEmbedding(embedding: number[]): string {
   return `[${embedding.join(",")}]`;
@@ -20,7 +21,7 @@ export function mapDocumentToCds(
   document: DocumentInterface,
   embedding: number[],
   storeName: string,
-): Document {
+): VectorDocumentAsEntity {
   const documentId = document.id ?? cds.utils.uuid();
   const metadata = mapDocumentMetadataToCds(
     document.metadata ?? {},
@@ -40,7 +41,7 @@ export function mapDocumentMetadataToCds(
   documentMetadata: Record<string, unknown>,
   documentId: string,
   storeName: string,
-): DocumentMetadata[] {
+): VectorDocumentMetadata[] {
   return Object.entries(documentMetadata ?? {}).map(([name, value]) => ({
     name,
     value: JSON.stringify(value),
@@ -49,7 +50,9 @@ export function mapDocumentMetadataToCds(
   }));
 }
 
-export function mapDocumentFromCds(document: Document): DocumentInterface {
+export function mapDocumentFromCds(
+  document: VectorDocumentAsEntity,
+): DocumentInterface {
   const metadata = mapDocumentMetadataFromCds(document.metadata ?? []);
   return {
     id: document.id,
@@ -59,7 +62,7 @@ export function mapDocumentFromCds(document: Document): DocumentInterface {
 }
 
 export function mapDocumentMetadataFromCds(
-  documentMetadata: DocumentMetadata[],
+  documentMetadata: VectorDocumentMetadata[],
 ): Record<string, unknown> {
   return documentMetadata.reduce((acc: Record<string, unknown>, entry) => {
     if (entry.name && entry.value) {
@@ -76,19 +79,8 @@ export type MetadataFilter = Record<
   | boolean
   | {
       $eq?: string | number | boolean;
-      /** Not equal to */
       $ne?: string | number | boolean;
-      /** Greater than (for numeric values) */
-      $gt?: number;
-      /** Greater than or equal (for numeric values) */
-      $gte?: number;
-      /** Less than (for numeric values) */
-      $lt?: number;
-      /** Less than or equal (for numeric values) */
-      $lte?: number;
-      /** Match any of the provided values */
       $in?: (string | number | boolean)[];
-      /** Exclude any of the provided values */
       $notIn?: (string | number | boolean)[];
     }
 >;
@@ -110,18 +102,20 @@ export function mapMetadataFilterToCdsExpr(filter: MetadataFilter): string {
           case "$ne":
             cdsFilter += ` AND metadata.value != '${operatorValue}'`;
             break;
-          case "$gt":
-            cdsFilter += ` AND metadata.value > '${operatorValue}'`;
+          case "$in": {
+            const values = (operatorValue as (string | number | boolean)[])
+              .map((v) => `'${v}'`)
+              .join(", ");
+            cdsFilter += ` AND metadata.value IN (${values})`;
             break;
-          case "$gte":
-            cdsFilter += ` AND metadata.value >= '${operatorValue}'`;
+          }
+          case "$notIn": {
+            const values = (operatorValue as (string | number | boolean)[])
+              .map((v) => `'${v}'`)
+              .join(", ");
+            cdsFilter += ` AND metadata.value NOT IN (${values})`;
             break;
-          case "$lt":
-            cdsFilter += ` AND metadata.value < '${operatorValue}'`;
-            break;
-          case "$lte":
-            cdsFilter += ` AND metadata.value <= '${operatorValue}'`;
-            break;
+          }
           default:
             throw new Error(`Unsupported operator: ${operator}`);
         }

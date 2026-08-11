@@ -11,8 +11,9 @@ cds.add?.register(
 cds.on("loaded", (model) => {
   if (!model.definitions["plugin.langchain.vectorstore.Documents"]) {
     LOG.warn(
-      `Detected '@mi8y/cds-langchain-vectorstore' CDS plugin installation, but no entities found in the model. ` +
-        `Did you forget to run 'cds add langchain-vectorstore' after installing the package?`,
+      `Detected '@mi8y/cds-langchain-vectorstore' CDS plugin installation, but no default entities found in the model. ` +
+        `Did you forget to run 'cds add langchain-vectorstore' after installing the package? ` +
+        `If using custom entity names, pass them via 'CdsVectorStoreConfig'.`,
     );
   }
 });
