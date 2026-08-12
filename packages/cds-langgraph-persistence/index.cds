@@ -23,3 +23,20 @@ entity CheckpointWrites {
         type       : String(64);
         value      : LargeString;
 }
+
+entity StoreItems {
+    key graphName  : String(256) not null;
+    key namespace  : String(256) not null;
+    key id         : String(256) not null;
+        createdAt  : Timestamp default $now;
+        modifiedAt : Timestamp default $now @cds.on.update: $now;
+        fields     : Composition of many StoreItemFields
+                         on fields.item = $self;
+}
+
+entity StoreItemFields {
+    key item      : Association to StoreItems;
+    key name      : String(256) not null;
+        value     : String;
+        embedding : Vector(1536); // TODO: Make this configurable based on the embedding model used
+}
