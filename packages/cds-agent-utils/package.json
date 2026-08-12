@@ -15,8 +15,9 @@
     }
   },
   "scripts": {
-    "build": "shx rm -rf dist && npm run build:cds-types && vite build",
+    "build": "shx rm -rf dist && npm run build:cds-types && vite build && npm run copy:cds-types",
     "build:cds-types": "node ../../scripts/build-cds-types.mjs",
+    "copy:cds-types": "shx cp -r @cds-models dist",
     "test": "vitest run --coverage",
     "lint": "eslint . --fix",
     "lint:check": "eslint . --max-warnings 0",

@@ -79,7 +79,11 @@ entity AgentCheckpoints : persistence.Checkpoint {
 }
 
 entity AgentCheckpointWrites : persistence.CheckpointWrite {
-    key checkpoint : Association to AgentCheckpoints;
+    checkpoint : Association to AgentCheckpoints
+                     on  checkpoint.graphName = $self.checkpoint_graphName
+                     and checkpoint.namespace = $self.checkpoint_namespace
+                     and checkpoint.threadId  = $self.checkpoint_threadId
+                     and checkpoint.id        = $self.checkpoint_id;
 }
 ```
 
@@ -102,7 +106,10 @@ entity AgentStoreItems : persistence.StoreItem {
 }
 
 entity AgentStoreItemFields : persistence.StoreItemField {
-    key item : Association to AgentStoreItems;
+    item      : Association to AgentStoreItems
+                    on  item.graphName = $self.graphName
+                    and item.namespace = $self.namespace
+                    and item.id        = $self.id;
     embedding : Vector(3072);
 }
 ```
@@ -165,12 +172,12 @@ new CdsCheckpointSaver(config, serde?)
 
 Config:
 
-| Option                      | Type     | Required | Description                                                                                                      |
-| --------------------------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
-| `name`                      | `string` | Yes      | Logical graph name stored with each checkpoint. Use a different name per graph or agent.                         |
-| `ttl`                       | `number` | No       | Checkpoint TTL in milliseconds. Expiry metadata is stored, but cleanup is still your responsibility.             |
-| `fqnCheckpointsEntity`      | `string` | No       | Fully qualified CDS entity name for checkpoint records. Defaults to `plugin.langgraph.persistence.Checkpoints`.  |
-| `fqnCheckpointWritesEntity` | `string` | No       | Fully qualified CDS entity name for pending writes. Defaults to `plugin.langgraph.persistence.CheckpointWrites`. |
+| Option                      | Type     | Required | Description                                                                                                                        |
+| --------------------------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                      | `string` | Yes      | Logical graph name stored with each checkpoint. Use a different name per graph or agent.                                           |
+| `ttl`                       | `number` | No       | Checkpoint TTL in milliseconds. The saver stores `expiresAt`; use `purgeExpiredCheckpoints()` to remove expired completed threads. |
+| `fqnCheckpointsEntity`      | `string` | No       | Fully qualified CDS entity name for checkpoint records. Defaults to `plugin.langgraph.persistence.Checkpoints`.                    |
+| `fqnCheckpointWritesEntity` | `string` | No       | Fully qualified CDS entity name for pending writes. Defaults to `plugin.langgraph.persistence.CheckpointWrites`.                   |
 
 Main methods:
 
@@ -270,9 +277,11 @@ Rules:
 `search(namespacePrefix, options?)` supports:
 
 - `query` for text search
-- `filter` for additional filtering
+- `filter` for additional filtering on the parent `StoreItems` query
 - `limit`
 - `offset`
+
+Stored payload fields are persisted in `StoreItemFields`, so `filter` does not currently apply field-level predicates to the stored JSON payload.
 
 Without embeddings, search matches against stored field values within the requested namespace prefix.
 
@@ -297,9 +306,9 @@ const store = new CdsMemoryStore({
 
 ## TTL Cleanup
 
-If you configure `ttl` on `CdsCheckpointSaver`, the plugin stores an `expiresAt` timestamp on checkpoints. It does not automatically delete expired records.
+If you configure `ttl` on `CdsCheckpointSaver`, the plugin stores an `expiresAt` timestamp on checkpoints. Expired threads are not deleted automatically unless you call the cleanup utility yourself.
 
-Use `purgeExpiredCheckpoints()` from a scheduled job or service endpoint:
+Use `purgeExpiredCheckpoints()` from a scheduled job or service endpoint. It deletes expired threads only when the latest checkpoint has no pending writes, and skips interrupted or in-progress threads:
 
 ```ts
 import cds from "@sap/cds";

@@ -10,8 +10,9 @@ import * as utils from "./utils";
 
 const LOG = cds.log("cds-langchain-vectorstore");
 
-const DEFAULT_DOCUMENTS_ENTITY = "plugin.langchain.vectorstore.Documents";
-const DEFAULT_DOCUMENT_METADATA_ENTITY =
+export const DEFAULT_FQN_ENTITY_DOCUMENTS =
+  "plugin.langchain.vectorstore.Documents";
+export const DEFAULT_FQN_ENTITY_DOCUMENT_METADATA =
   "plugin.langchain.vectorstore.DocumentMetadata";
 
 export type CdsVectorStoreConfig = {
@@ -40,9 +41,9 @@ export class CDSVectorStore extends VectorStore {
     this.#storeName = config.name;
     this.#searchThreshold = config.threshold ?? 0.75;
     this.#fqnVectorDocument =
-      config.fqnDocumentsEntity ?? DEFAULT_DOCUMENTS_ENTITY;
+      config.fqnDocumentsEntity ?? DEFAULT_FQN_ENTITY_DOCUMENTS;
     this.#fqnVectorDocumentMetadata =
-      config.fqnDocumentMetadataEntity ?? DEFAULT_DOCUMENT_METADATA_ENTITY;
+      config.fqnDocumentMetadataEntity ?? DEFAULT_FQN_ENTITY_DOCUMENT_METADATA;
   }
 
   _vectorstoreType(): string {
