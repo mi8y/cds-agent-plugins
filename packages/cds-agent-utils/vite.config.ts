@@ -21,7 +21,7 @@ export default defineConfig({
     minify: false, // disable since this is a node library
     lib: {
       entry: "src/index.ts",
-      name: "@mi8y/cds-langchain-vectorstore",
+      name: "@mi8y/cds-agent-utils",
       fileName: "index",
       formats: ["es", "cjs"],
     },
@@ -39,7 +39,7 @@ export default defineConfig({
 
   // Testing Configuration (Vitest)
   test: {
-    name: "cds-langchain-vectorstore",
+    name: "cds-agent-utils",
     globals: true,
     root: import.meta.dirname,
     environment: "node",

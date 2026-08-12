@@ -1,13 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
-  StoreItemFields,
-  StoreItems,
-} from "#cds-models/plugin/langgraph/persistence";
-import { CdsMemoryStore } from "@/memory/cds-memory";
+  CdsMemoryStore,
+  DEFAULT_FQN_ENTITY_STORE_ITEM_FIELDS,
+  DEFAULT_FQN_ENTITY_STORE_ITEMS,
+} from "@/memory/cds-memory";
 import { Embeddings } from "@langchain/core/embeddings";
 import { InvalidNamespaceError } from "@langchain/langgraph-checkpoint";
 import cds from "@sap/cds";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -46,7 +48,10 @@ describe("CdsMemoryStore", () => {
   let store: CdsMemoryStore;
 
   beforeAll(async () => {
-    const csn = await cds.load("index.cds").then(cds.minify);
+    const cdsFilePath = fileURLToPath(
+      import.meta.resolve("./model.cds", import.meta.url),
+    );
+    const csn = await cds.load(cdsFilePath).then(cds.minify);
     cds.model = cds.compile.for.nodejs(csn);
 
     cds.requires.db = {
@@ -58,7 +63,7 @@ describe("CdsMemoryStore", () => {
     cds.db = await cds.connect.to("db");
 
     // @ts-ignore
-    await cds.deploy("index.cds", {}).to(cds.db);
+    await cds.deploy(cdsFilePath, {}).to(cds.db);
   });
 
   afterAll(async () => {
@@ -68,8 +73,8 @@ describe("CdsMemoryStore", () => {
 
   beforeEach(async () => {
     store = new CdsMemoryStore({ name: "test-store" });
-    await DELETE.from(StoreItems);
-    await DELETE.from(StoreItemFields);
+    await DELETE.from(DEFAULT_FQN_ENTITY_STORE_ITEMS);
+    await DELETE.from(DEFAULT_FQN_ENTITY_STORE_ITEM_FIELDS);
   });
 
   // ---------------------------------------------------------------------------
@@ -445,7 +450,7 @@ describe("CdsMemoryStore", () => {
 
       embeddingStore = new CdsMemoryStore({
         name: "test-store-hybrid",
-        index: { embeddings: mockEmbedding },
+        embeddings: mockEmbedding,
       });
 
       await embeddingStore.put(["docs"], "doc1", {

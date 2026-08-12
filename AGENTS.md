@@ -8,23 +8,23 @@ This is a turbo-based monorepo containing CDS plugins for building production-re
 ├── AGENTS.md <- You are here
 ├── package.json
 ├── packages
-│ . ├── cds-langgraph-integration-tests
-│ . │ . ├── AGENTS.md <- Read this for integration test setup
-│ . │ . └── ...
-│ . ├── cds-langgraph-persistence
-│ . │ . ├── AGENTS.md <- Read this for persistence plugin (checkpoint & memory) setup
-│ . │ . └── ...
-│ . ├── cds-langchain-vectorstore
-│ . │ . ├── AGENTS.md <- Read this for vectorstore plugin setup
-│ . │ . └── ...
-│ . └── cds-langchain-telemetry
-│ . . ├── AGENTS.md <- Read this for telemetry plugin setup
-│ . . └── ...
+│   ├── cds-agent-utils
+│   │   ├── AGENTS.md <- Read this for common utils
+│   │   └── ...
+│   ├── cds-langgraph-integration-tests
+│   │   ├── AGENTS.md <- Read this for integration test setup
+│   │   └── ...
+│   ├── cds-langgraph-persistence
+│   │   ├── AGENTS.md <- Read this for persistence plugin (checkpoint & memory) setup
+│   │   └── ...
+│   ├── cds-langchain-vectorstore
+│   │   ├── AGENTS.md <- Read this for vectorstore plugin setup
+│   │   └── ...
+│   └── cds-langchain-telemetry
+│     ├── AGENTS.md <- Read this for telemetry plugin setup
+│     └── ...
 ├── examples
-│ . └── ...
-├── tests
-│ . ├── checkpoint
-│ . └── memory
+│   └── ...
 └── cds-plugin.js
 
 ## Development

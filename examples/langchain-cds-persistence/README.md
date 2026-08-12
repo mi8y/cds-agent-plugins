@@ -86,7 +86,7 @@ Switching to `test-thread-2` starts a fresh conversation. The agent has no memor
 
 ## How It Works
 
-1. **CDS plugin auto-registration.** Installing `@mi8y/cds-langgraph-persistence` adds `Checkpoints` and `CheckpointWrites` tables to your CDS model automatically. No manual schema setup.
+1. **CDS add generation.** After installing `@mi8y/cds-langgraph-persistence`, run `cds add langgraph-checkpointer` to generate the default `Checkpoints` and `CheckpointWrites` entities in your CAP project.
 
 2. **Checkpoint saver.** The `CdsCheckpointSaver` implements LangGraph's `BaseCheckpointSaver` interface using CDS queries (`SELECT`, `UPSERT`, `DELETE`). It serializes agent state on every step and deserializes it when a thread resumes.
 

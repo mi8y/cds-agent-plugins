@@ -1,42 +1,52 @@
-namespace plugin.langgraph.persistence;
+//////////////////////////////////////////
+///// CHECKPOINTS (SHORT-TERM MEMORY) ////
+//////////////////////////////////////////
 
-entity Checkpoints {
+// NOTE: `parent_id` & `checkpoint_*` fields are used to keep backwards compatibility with the previous
+//       `entity` based implementation where there were associations/compositions relationships.
+
+aspect Checkpoint {
     key graphName  : String(256) not null;
     key id         : String(256) not null;
     key namespace  : String(256) not null default '';
     key threadId   : String(256) not null;
-        parent     : Association to one Checkpoints;
+        parent_id  : String(256);
         type       : String(64);
         checkpoint : LargeString not null;
         metadata   : LargeString;
         createdAt  : Timestamp default $now;
+        updatedAt  : Timestamp default $now @cds.on.update: $now;
         expiresAt  : Timestamp;
-        writes     : Composition of many CheckpointWrites
-                         on writes.checkpoint = $self;
 }
 
-entity CheckpointWrites {
-    key checkpoint : Association to Checkpoints;
-    key taskId     : String(256) not null;
-    key idx        : Integer not null;
-        channel    : String(256) not null;
-        type       : String(64);
-        value      : LargeString;
+aspect CheckpointWrite {
+    key checkpoint_graphName : String(256) not null;
+    key checkpoint_id        : String(256) not null;
+    key checkpoint_namespace : String(256) not null default '';
+    key checkpoint_threadId  : String(256) not null;
+    key taskId               : String(256) not null;
+    key idx                  : Integer not null;
+        channel              : String(256) not null;
+        type                 : String(64);
+        value                : LargeString;
 }
 
-entity StoreItems {
+//////////////////////////////////////////
+///// MEMORY STORE (LONG-TERM MEMORY) ////
+//////////////////////////////////////////
+
+aspect StoreItem {
     key graphName  : String(256) not null;
     key namespace  : String(256) not null;
     key id         : String(256) not null;
         createdAt  : Timestamp default $now;
         modifiedAt : Timestamp default $now @cds.on.update: $now;
-        fields     : Composition of many StoreItemFields
-                         on fields.item = $self;
 }
 
-entity StoreItemFields {
-    key item      : Association to StoreItems;
+aspect StoreItemField {
+    key graphName : String(256) not null;
+    key namespace : String(256) not null;
+    key id        : String(256) not null;
     key name      : String(256) not null;
         value     : String;
-        embedding : Vector(1536); // TODO: Make this configurable based on the embedding model used
 }

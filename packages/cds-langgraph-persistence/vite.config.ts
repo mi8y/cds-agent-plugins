@@ -39,6 +39,7 @@ export default defineConfig({
 
   // Testing Configuration (Vitest)
   test: {
+    name: "cds-langgraph-persistence",
     globals: true,
     root: import.meta.dirname,
     environment: "node",

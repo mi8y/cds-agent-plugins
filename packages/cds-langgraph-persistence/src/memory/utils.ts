@@ -1,10 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  StoreItem,
-  StoreItemField,
-} from "#cds-models/plugin/langgraph/persistence";
 import { Embeddings } from "@langchain/core/embeddings";
 import { Item } from "@langchain/langgraph-checkpoint";
+import { StoreItem, StoreItemField } from "#cds-models/index";
 
 export function mapNamespaceToCds(namespace: string[]): string {
   return namespace.join(":");
@@ -20,7 +17,7 @@ export function mapStoreItemFromCds(storeItem: StoreItem): Item {
     updatedAt: new Date(storeItem.modifiedAt!),
     namespace: mapNamespaceFromCds(storeItem.namespace!),
     key: storeItem.id!,
-    value: mapStoreItemFieldsFromCds(storeItem.fields ?? []),
+    value: [],
   } as Item;
 }
 
@@ -46,9 +43,9 @@ export function mapStoreItemFieldsToCds(
       ({
         name,
         value: JSON.stringify(value), // store primitive values as JSON strings
-        item_graphName: graphName,
-        item_namespace: namespaceKey,
-        item_id: key,
+        graphName,
+        namespace: namespaceKey,
+        id: key,
       }) as StoreItemField,
   );
 }
