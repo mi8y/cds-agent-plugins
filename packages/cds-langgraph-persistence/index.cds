@@ -49,4 +49,5 @@ aspect StoreItemField {
     key id        : String(256) not null;
     key name      : String(256) not null;
         value     : String;
+        embedding : Vector;
 }

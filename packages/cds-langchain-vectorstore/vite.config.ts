@@ -4,6 +4,10 @@ import dts from "vite-plugin-dts";
 import { builtinModules } from "module";
 import pkg from "./package.json";
 
+const externalDependencies = Object.keys(pkg.dependencies || {}).filter(
+  (dependency) => dependency !== "@mi8y/cds-agent-utils",
+);
+
 export default defineConfig({
   plugins: [
     dts({
@@ -31,7 +35,7 @@ export default defineConfig({
         // ignore dependencies when bundling
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
-        ...Object.keys(pkg.dependencies || {}),
+        ...externalDependencies,
         ...Object.keys(pkg.peerDependencies || {}),
       ],
     },

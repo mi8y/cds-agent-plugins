@@ -13,5 +13,5 @@ entity Documents : managed, VectorDocument {
 }
 
 entity DocumentMetadata : VectorDocumentMetadata {
-    key document : Association to Documents;
+    document : Association to Documents;
 }

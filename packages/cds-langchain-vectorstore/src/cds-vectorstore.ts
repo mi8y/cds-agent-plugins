@@ -1,3 +1,4 @@
+import type { VectorDocument, VectorDocumentMetadata } from "#cds-models/index";
 import { Document, DocumentInterface } from "@langchain/core/documents";
 import type { EmbeddingsInterface } from "@langchain/core/embeddings";
 import { maximalMarginalRelevance } from "@langchain/core/utils/math";
@@ -5,6 +6,7 @@ import {
   MaxMarginalRelevanceSearchOptions,
   VectorStore,
 } from "@langchain/core/vectorstores";
+import { readParentsWithChildren } from "@mi8y/cds-agent-utils";
 import cds from "@sap/cds";
 import * as utils from "./utils";
 
@@ -61,19 +63,26 @@ export class CDSVectorStore extends VectorStore {
     const cdsDocuments = documents.map((doc, idx) =>
       utils.mapDocumentToCds(doc, vectors[idx], this.#storeName),
     );
-    const documentIds = cdsDocuments.map((doc) => doc.id as string);
+
+    const documentIds = cdsDocuments.map((doc) => doc.documentId as string);
+    const allMetadata = documents.flatMap((doc, idx) =>
+      utils.mapDocumentMetadataToCds(
+        doc.metadata ?? {},
+        documentIds[idx],
+        this.#storeName,
+      ),
+    );
 
     // first delete any existing document metadata
     await DELETE.from(this.#fqnVectorDocumentMetadata).where({
-      document_storeName: this.#storeName,
-      document_id: { in: documentIds },
+      storeName: this.#storeName,
+      documentId: { in: documentIds },
     });
 
     // then update/insert the documents
     await UPSERT.into(this.#fqnVectorDocument).entries(cdsDocuments);
 
-    // explicitly insert the composition metadata
-    const allMetadata = cdsDocuments.flatMap((doc) => doc.metadata ?? []);
+    // insert the composition metadata
     if (allMetadata.length > 0) {
       await INSERT.into(this.#fqnVectorDocumentMetadata).entries(allMetadata);
     }
@@ -103,7 +112,7 @@ export class CDSVectorStore extends VectorStore {
     // If documentIds are provided, add a condition to delete only those documents
     if (documentIds) {
       query = query.where({
-        id: { in: documentIds },
+        documentId: { in: documentIds },
       });
     }
 
@@ -119,9 +128,15 @@ export class CDSVectorStore extends VectorStore {
     embedding: number[],
     k: number,
     filter?: this["FilterType"],
-  ): Promise<{ document: utils.VectorDocumentAsEntity; similarity: number }[]> {
+  ): Promise<
+    {
+      document: VectorDocument;
+      metadata: VectorDocumentMetadata[];
+      similarity: number;
+    }[]
+  > {
     // @ts-expect-error: The `expr` function is not recognized by TypeScript, but it is available in the runtime environment.
-    const { expand, expr, ref, columns } = cds.ql;
+    const { expr } = cds.ql;
 
     // build the embedding string for the query
     let embeddingStr = utils.serializeEmbedding(embedding);
@@ -129,45 +144,57 @@ export class CDSVectorStore extends VectorStore {
       embeddingStr = `to_real_vector(${embeddingStr})`;
     }
 
-    let query = SELECT.from(this.#fqnVectorDocument)
-      .columns([
-        "storeName",
-        "id",
-        "pageContent",
-        "embedding",
-        expand(ref`metadata`, columns`name,value`),
-        expr`cosine_similarity(embedding, ${embeddingStr})`,
-      ])
-      .where(
-        expr`storeName = ${this.#storeName} and cosine_similarity(embedding, ${embeddingStr}) > ${this.#searchThreshold}`,
-      )
-      .limit(k);
+    const metadataWhere = utils.mapMetadataFilterToCdsWhere(
+      this.#fqnVectorDocumentMetadata,
+      filter,
+      this.#storeName,
+    );
 
-    if (filter) {
-      const cdsFilter = utils.mapMetadataFilterToCdsExpr(filter);
-      query = query.where(`${cdsFilter}`);
-    }
+    const relationProperty = "metadata" as const;
+    type ParentDocument = VectorDocument & {
+      cosine_similarity?: number;
+    };
+    type MetadataEntry = VectorDocumentMetadata;
+    type HydratedDocument = ParentDocument & {
+      [relationProperty]: MetadataEntry[];
+    };
 
-    const res = await query;
-    if (!res || res.length === 0) {
-      return [];
-    }
+    const { result } = await readParentsWithChildren<
+      ParentDocument,
+      MetadataEntry
+    >({
+      match: [
+        { parent: "storeName", child: "storeName" },
+        { parent: "documentId", child: "documentId" },
+      ],
+      readParents: async () =>
+        SELECT.from(this.#fqnVectorDocument)
+          .columns([
+            "storeName",
+            "documentId",
+            "pageContent",
+            "embedding",
+            expr`cosine_similarity(embedding, ${embeddingStr})`,
+          ])
+          .where(
+            expr`storeName = ${this.#storeName} and cosine_similarity(embedding, ${embeddingStr}) > ${this.#searchThreshold}`,
+          )
+          .where(metadataWhere ? expr(metadataWhere) : undefined)
+          .limit(k)
+          .orderBy("cosine_similarity desc"),
+      readChildren: async ({ where }) => {
+        return await SELECT.from(this.#fqnVectorDocumentMetadata).where(where);
+      },
+      relationProperty,
+    });
 
-    return res
-      .map(
-        (
-          cdsDoc: utils.VectorDocumentAsEntity & { cosine_similarity?: number },
-        ) => ({
-          document: cdsDoc,
-          similarity: cdsDoc["cosine_similarity"] ?? 0,
-        }),
-      )
-      .sort(
-        (
-          a: { document: utils.VectorDocumentAsEntity; similarity: number },
-          b: { document: utils.VectorDocumentAsEntity; similarity: number },
-        ) => b.similarity - a.similarity,
-      );
+    return (result as unknown as HydratedDocument[]).map(
+      (cdsDoc: HydratedDocument) => ({
+        document: cdsDoc,
+        metadata: cdsDoc[relationProperty] ?? [],
+        similarity: cdsDoc["cosine_similarity"] ?? 0,
+      }),
+    );
   }
 
   async similaritySearchVectorWithScore(
@@ -176,8 +203,8 @@ export class CDSVectorStore extends VectorStore {
     filter?: this["FilterType"],
   ): Promise<[Document, number][]> {
     const res = await this.#query(query, k, filter);
-    return res.map(({ document: cdsDoc, similarity }) => [
-      utils.mapDocumentFromCds(cdsDoc),
+    return res.map(({ document: cdsDoc, metadata, similarity }) => [
+      utils.mapDocumentFromCds(cdsDoc, metadata),
       similarity,
     ]);
   }
@@ -205,7 +232,9 @@ export class CDSVectorStore extends VectorStore {
       options.k,
     );
 
-    return mmrIndexes.map((idx) => utils.mapDocumentFromCds(res[idx].document));
+    return mmrIndexes.map((idx) =>
+      utils.mapDocumentFromCds(res[idx].document, res[idx].metadata),
+    );
   }
 
   static async fromTexts(

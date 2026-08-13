@@ -92,6 +92,10 @@ importers:
         version: 8.65.0(eslint@10.6.0)(typescript@6.0.3)
 
   packages/cds-langchain-vectorstore:
+    dependencies:
+      '@mi8y/cds-agent-utils':
+        specifier: workspace:*
+        version: link:../cds-agent-utils
     devDependencies:
       '@cap-js/cds-typer':
         specifier: ^0.40.0
