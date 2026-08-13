@@ -131,6 +131,9 @@ export class CdsMemoryStore extends BaseStore {
     offset,
     query,
   }: SearchOperation): Promise<SearchItem[]> {
+    // @ts-expect-error: The `expr` function is not recognized by TypeScript, but it is available in the runtime environment.
+    const { expr } = cds.ql;
+
     const namespacePrefixKey = utils.mapNamespaceToCds(namespacePrefix);
     let cdsQuery = SELECT.from(this.#fqnStoreItemsEntity)
       .where({
@@ -141,16 +144,18 @@ export class CdsMemoryStore extends BaseStore {
       .orderBy("createdAt desc");
 
     if (filter) {
-      const cdsFilter = utils.mapFilterToCds(filter);
-      cdsQuery = cdsQuery.where({
-        ...cdsFilter,
-      });
+      const metadataWhere = utils.mapMetadataFilterToCdsWhere(
+        this.#fqnStoreItemFieldsEntity,
+        filter,
+        this.#graphName,
+        namespacePrefixKey,
+      );
+      cdsQuery = cdsQuery.where(
+        metadataWhere ? expr(metadataWhere) : undefined,
+      );
     }
 
     if (query) {
-      // @ts-expect-error: The `expr` function is not recognized by TypeScript, but it is available in the runtime environment.
-      const { expr } = cds.ql;
-
       if (this.#params.embeddings) {
         const queryEmbedding = await this.#params.embeddings.embedQuery(query);
         cdsQuery = cdsQuery.where(

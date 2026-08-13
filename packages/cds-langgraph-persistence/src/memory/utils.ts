@@ -103,6 +103,146 @@ export function mapFilterToCds(
   return cdsFilter;
 }
 
+export type MetadataFilterValue =
+  | string
+  | number
+  | boolean
+  | {
+      $eq?: string | number | boolean;
+      $ne?: string | number | boolean;
+      $in?: (string | number | boolean)[];
+      $notIn?: (string | number | boolean)[];
+    };
+
+export type MetadataFilter = Record<string, MetadataFilterValue>;
+
+function serializeFilterValue(value: string | number | boolean): string {
+  return JSON.stringify(value);
+}
+
+function quoteCqlString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function scalarCondition(
+  fieldName: string,
+  value: string | number | boolean,
+): string {
+  return `name = ${quoteCqlString(fieldName)} and value = ${quoteCqlString(
+    serializeFilterValue(value),
+  )}`;
+}
+
+function buildMetadataCondition(
+  fieldName: string,
+  value: MetadataFilterValue,
+): { include?: string; exclude?: string } {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {
+      include: scalarCondition(fieldName, value as string | number | boolean),
+    };
+  }
+
+  const includeClauses = new Set<string>();
+  const excludeClauses = new Set<string>();
+  let hasPositiveValueMatch = false;
+
+  for (const [operator, operatorValue] of Object.entries(value)) {
+    switch (operator) {
+      case "$eq":
+        includeClauses.add(
+          scalarCondition(
+            fieldName,
+            operatorValue as string | number | boolean,
+          ),
+        );
+        hasPositiveValueMatch = true;
+        break;
+      case "$ne":
+        if (!hasPositiveValueMatch) {
+          includeClauses.add(`name = ${quoteCqlString(fieldName)}`);
+        }
+        excludeClauses.add(
+          scalarCondition(
+            fieldName,
+            operatorValue as string | number | boolean,
+          ),
+        );
+        break;
+      case "$in": {
+        const serializedValues = (
+          operatorValue as (string | number | boolean)[]
+        )
+          .map((entry) => quoteCqlString(serializeFilterValue(entry)))
+          .join(", ");
+        includeClauses.add(
+          `name = ${quoteCqlString(fieldName)} and value in (${serializedValues})`,
+        );
+        hasPositiveValueMatch = true;
+        break;
+      }
+      case "$notIn": {
+        const serializedValues = (
+          operatorValue as (string | number | boolean)[]
+        )
+          .map((entry) => quoteCqlString(serializeFilterValue(entry)))
+          .join(", ");
+        if (!hasPositiveValueMatch) {
+          includeClauses.add(`name = ${quoteCqlString(fieldName)}`);
+        }
+        excludeClauses.add(
+          `name = ${quoteCqlString(fieldName)} and value in (${serializedValues})`,
+        );
+        break;
+      }
+      default:
+        throw new Error(`Unsupported operator: ${operator}`);
+    }
+  }
+
+  return {
+    include:
+      includeClauses.size > 0 ? [...includeClauses].join(" and ") : undefined,
+    exclude:
+      excludeClauses.size > 0 ? [...excludeClauses].join(" or ") : undefined,
+  };
+}
+
+export function mapMetadataFilterToCdsWhere(
+  storeItemFieldsEntity: string,
+  filter: MetadataFilter | undefined,
+  graphName: string,
+  namespace: string,
+): string | undefined {
+  if (!filter) {
+    return undefined;
+  }
+
+  const clauses: string[] = [];
+
+  for (const [key, value] of Object.entries(filter)) {
+    if (value === undefined) {
+      continue;
+    }
+
+    const { include, exclude } = buildMetadataCondition(key, value);
+
+    if (include) {
+      clauses.push(
+        `id in (select id from ${storeItemFieldsEntity} where graphName = ${quoteCqlString(graphName)} and namespace like ${quoteCqlString(`${namespace}%`)} and ${include})`,
+      );
+    }
+
+    if (exclude) {
+      clauses.push(
+        `id not in (select id from ${storeItemFieldsEntity} where graphName = ${quoteCqlString(graphName)} and namespace like ${quoteCqlString(`${namespace}%`)} and (${exclude}))`,
+      );
+    }
+  }
+
+  return clauses.length > 0 ? clauses.join(" and ") : undefined;
+}
+
 export async function embedCdsStoreItemFields(
   storeItemFields: StoreItemField[],
   embeddings: Embeddings,
