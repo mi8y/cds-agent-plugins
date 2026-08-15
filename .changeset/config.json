@@ -7,5 +7,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@examples/*", "@mi8y/cds-langgraph-integration-tests"]
+  "ignore": ["@examples/*", "@mi8y/integration-tests"]
 }

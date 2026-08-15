@@ -54,7 +54,7 @@ async function cleanup() {
 
 describe("CDS Plugin Integration", () => {
   cds.root = path.join(import.meta.dirname, "../");
-  const { expect } = cds.test("@mi8y/cds-langgraph-integration-tests");
+  const { expect } = cds.test("@mi8y/integration-tests");
 
   // ── CDS Plugin — Model Loading ──────────────────────────────────────
 
