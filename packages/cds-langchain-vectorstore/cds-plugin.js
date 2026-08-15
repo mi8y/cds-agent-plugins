@@ -9,11 +9,25 @@ cds.add?.register(
 );
 
 cds.on("loaded", (model) => {
-  if (!model.definitions["plugin.langchain.vectorstore.Documents"]) {
+  let hasCdsDocumentAspectApplied,
+    hasCdsDocumentMetadataAspectApplied = false;
+
+  // check if model has implemented persistence related aspects in their entities
+  for (const entityName in model.definitions) {
+    const entity = model.definitions[entityName];
+    if (entity.kind === "entity" && entity.includes) {
+      hasCdsDocumentAspectApplied ||=
+        entity.includes.includes("VectorDocument");
+      hasCdsDocumentMetadataAspectApplied ||= entity.includes.includes(
+        "VectorDocumentMetadata",
+      );
+    }
+  }
+
+  if (!(hasCdsDocumentAspectApplied && hasCdsDocumentMetadataAspectApplied)) {
     LOG.warn(
-      `Detected '@mi8y/cds-langchain-vectorstore' CDS plugin installation, but no default entities found in the model. ` +
-        `Did you forget to run 'cds add langchain-vectorstore' after installing the package? ` +
-        `If using custom entity names, pass them via 'CdsVectorStoreConfig'.`,
+      `Detected '@mi8y/cds-langchain-vectorstore' CDS plugin installation, but no entities implementing the aspects 'VectorDocument' or 'VectorDocumentMetadata' found in the model. ` +
+        `Run 'cds add langchain-vectorstore' to add the default vectorstore entities.`,
     );
   }
 });

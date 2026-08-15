@@ -29,10 +29,10 @@ Register the CDS entities in your CAP project:
 
 ```bash
 cds add langgraph-checkpointer
-cds add langgraph-memory-store
+cds add langgraph-memorystore
 ```
 
-This creates `srv/langgraph-checkpointer.cds` and `srv/langgraph-memory-store.cds` so the persistence entities are part of your project model at build time.
+This creates `srv/langgraph-checkpointer.cds` and `srv/langgraph-memorystore.cds` so the persistence entities are part of your project model at build time.
 
 For backward compatibility, `cds add langgraph-persistence` remains available as an alias that runs both generators.
 

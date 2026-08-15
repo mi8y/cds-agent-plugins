@@ -8,7 +8,7 @@ using {
 
 entity Documents : managed, VectorDocument {
     embedding : Vector(1536); // IMPORTANT: The field name must be "embedding". // NOTE: The vector dimension must match the embedding model used
-    metadata  : Composition of many DocumentMetadata // IMPORTANT: The composition must be named "metadata"
+    metadata  : Composition of many DocumentMetadata
                     on metadata.document = $self;
 }
 

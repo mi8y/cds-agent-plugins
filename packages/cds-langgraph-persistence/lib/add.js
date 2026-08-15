@@ -69,7 +69,7 @@ async function addMemoryStoreEntities() {
   const srvRelPath = cds.env.folders?.srv || "srv/";
   const cdsFileRelPath = cds.utils.path.join(
     srvRelPath,
-    "langgraph-memory-store.cds",
+    "langgraph-memorystore.cds",
   );
   await writeCdsFile(
     cdsFileRelPath,

@@ -14,7 +14,7 @@ cds.add?.register(
 
 // adds long-term memory - Memory Store
 cds.add?.register(
-  "langgraph-memory-store",
+  "langgraph-memorystore",
   require("./lib/add").AddLangGraphMemoryStorePlugin,
 );
 
@@ -29,32 +29,35 @@ cds.add?.register(
  */
 
 cds.on("loaded", (model) => {
-  const hasCheckpointer = Boolean(
-    model.definitions["plugin.langgraph.persistence.Checkpoints"],
-  );
-  const hasMemoryStore = Boolean(
-    model.definitions["plugin.langgraph.persistence.StoreItems"],
-  );
+  let hasCdsCheckpointAspectApplied,
+    hasCdsCheckpointWriteAspectApplied = false;
+  let hasCdsStoreItemAspectApplied,
+    hasCdsStoreItemFieldAspectApplied = false;
 
-  if (!hasCheckpointer && !hasMemoryStore) {
-    LOG.warn(
-      `Detected '@mi8y/cds-langgraph-persistence' CDS plugin installation, but no entities found in the model. ` +
-        `Did you forget to run 'cds add langgraph-checkpointer' and/or 'cds add langgraph-memory-store' after installing the package?`,
-    );
-    return;
+  // check if model has implemented persistence related aspects in their entities
+  for (const entityName in model.definitions) {
+    const entity = model.definitions[entityName];
+    if (entity.kind === "entity" && entity.includes) {
+      hasCdsCheckpointAspectApplied ||= entity.includes.includes("Checkpoint");
+      hasCdsCheckpointWriteAspectApplied ||=
+        entity.includes.includes("CheckpointWrite");
+      hasCdsStoreItemAspectApplied ||= entity.includes.includes("StoreItem");
+      hasCdsStoreItemFieldAspectApplied ||=
+        entity.includes.includes("StoreItemField");
+    }
   }
 
-  if (!hasCheckpointer) {
+  if (!(hasCdsCheckpointAspectApplied && hasCdsCheckpointWriteAspectApplied)) {
     LOG.warn(
-      `Detected '@mi8y/cds-langgraph-persistence' installation, but no checkpoint entities found in the model. ` +
+      `Detected '@mi8y/cds-langgraph-persistence' installation, but no entities which implements the aspects 'Checkpoint' or 'CheckpointWrite', found in the model. ` +
         `Run 'cds add langgraph-checkpointer' to add the default checkpoint entities.`,
     );
   }
 
-  if (!hasMemoryStore) {
+  if (!(hasCdsStoreItemAspectApplied && hasCdsStoreItemFieldAspectApplied)) {
     LOG.warn(
-      `Detected '@mi8y/cds-langgraph-persistence' installation, but no memory store entities found in the model. ` +
-        `Run 'cds add langgraph-memory-store' to add the default memory store entities.`,
+      `Detected '@mi8y/cds-langgraph-persistence' installation, but no entities which implements the aspects 'StoreItem' or 'StoreItemField', found in the model. ` +
+        `Run 'cds add langgraph-memorystore' to add the default memory store entities.`,
     );
   }
 });

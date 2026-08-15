@@ -162,7 +162,7 @@ jobs:
           cd packages/cds-langgraph-integration-tests
           export CDS_ROOT="$GITHUB_WORKSPACE/packages/cds-langgraph-integration-tests"
           pnpm exec cds add langgraph-checkpointer
-          pnpm exec cds add langgraph-memory-store
+          pnpm exec cds add langgraph-memorystore
 
       - name: Run unit & integration tests
         shell: bash
