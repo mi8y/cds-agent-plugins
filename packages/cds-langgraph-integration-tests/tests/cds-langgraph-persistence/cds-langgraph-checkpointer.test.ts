@@ -5,6 +5,8 @@ import {
 import {
   CdsCheckpointSaver,
   purgeExpiredCheckpoints,
+  DEFAULT_FQN_ENTITY_CHECKPOINTS,
+  DEFAULT_FQN_ENTITY_CHECKPOINT_WRITES,
 } from "@mi8y/cds-langgraph-persistence";
 import cds from "@sap/cds";
 import path from "path";
@@ -46,9 +48,8 @@ function makeConfig(
 }
 
 async function cleanup() {
-  const { CheckpointWrites, Checkpoints } = cds.entities(NS);
-  await DELETE.from(CheckpointWrites);
-  await DELETE.from(Checkpoints);
+  await DELETE.from(DEFAULT_FQN_ENTITY_CHECKPOINT_WRITES);
+  await DELETE.from(DEFAULT_FQN_ENTITY_CHECKPOINTS);
 }
 
 describe("CDS Plugin Integration", () => {

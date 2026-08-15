@@ -4,10 +4,6 @@ import dts from "vite-plugin-dts";
 import { builtinModules } from "module";
 import pkg from "./package.json";
 
-const externalDependencies = Object.keys(pkg.dependencies || {}).filter(
-  (dependency) => dependency !== "@mi8y/cds-agent-utils",
-);
-
 export default defineConfig({
   plugins: [
     dts({
@@ -25,7 +21,7 @@ export default defineConfig({
     minify: false, // disable since this is a node library
     lib: {
       entry: "src/index.ts",
-      name: "@mi8y/cds-langchain-vectorstore",
+      name: "@mi8y/cds-agent-utils",
       fileName: "index",
       formats: ["es", "cjs"],
     },
@@ -35,7 +31,7 @@ export default defineConfig({
         // ignore dependencies when bundling
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
-        ...externalDependencies,
+        ...Object.keys(pkg.dependencies || {}),
         ...Object.keys(pkg.peerDependencies || {}),
       ],
     },
@@ -43,7 +39,7 @@ export default defineConfig({
 
   // Testing Configuration (Vitest)
   test: {
-    name: "cds-langchain-vectorstore",
+    name: "cds-agent-utils",
     globals: true,
     root: import.meta.dirname,
     environment: "node",

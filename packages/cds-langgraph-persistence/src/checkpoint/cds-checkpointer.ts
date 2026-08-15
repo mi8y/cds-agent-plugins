@@ -1,8 +1,7 @@
 import {
-  Checkpoints,
-  CheckpointWrite,
-  CheckpointWrites,
-} from "#cds-models/plugin/langgraph/persistence";
+  Checkpoint as TCheckpoint,
+  CheckpointWrite as TCheckpointWrite,
+} from "#cds-models/index";
 import { type RunnableConfig } from "@langchain/core/runnables";
 import {
   BaseCheckpointSaver,
@@ -10,6 +9,7 @@ import {
   Checkpoint,
   CheckpointListOptions,
   CheckpointMetadata,
+  CheckpointPendingWrite,
   CheckpointTuple,
   copyCheckpoint,
   maxChannelVersion,
@@ -18,7 +18,23 @@ import {
   TASKS,
   WRITES_IDX_MAP,
 } from "@langchain/langgraph-checkpoint";
+import { readParentsWithChildren } from "@mi8y/cds-agent-utils";
 import cds from "@sap/cds";
+
+export const DEFAULT_FQN_ENTITY_CHECKPOINTS =
+  "plugin.langgraph.persistence.Checkpoints";
+export const DEFAULT_FQN_ENTITY_CHECKPOINT_WRITES =
+  "plugin.langgraph.persistence.CheckpointWrites";
+
+// Maps Checkpoints -> their related CheckpointWrites rows (mirrors the
+// association declared in lib/add.js), enabling parents+children reads in
+// just two DB calls via `readParentsWithChildren`.
+const CHECKPOINT_WRITES_MATCH = [
+  { parent: "graphName", child: "checkpoint_graphName" },
+  { parent: "namespace", child: "checkpoint_namespace" },
+  { parent: "threadId", child: "checkpoint_threadId" },
+  { parent: "id", child: "checkpoint_id" },
+];
 
 /**
  * Configuration for {@link CdsCheckpointSaver}.
@@ -53,6 +69,18 @@ export type CdsCheckpointSaverConfig = {
    * ```
    */
   ttl?: number;
+  /**
+   * The fully qualified name of the entity to use for storing checkpoints.
+   *
+   * @default "plugin.langgraph.persistence.Checkpoints"
+   */
+  fqnCheckpointsEntity?: string;
+  /**
+   * The fully qualified name of the entity to use for storing pending writes.
+   *
+   * @default "plugin.langgraph.persistence.CheckpointWrites"
+   */
+  fqnCheckpointWritesEntity?: string;
 };
 
 /**
@@ -74,15 +102,20 @@ export type CdsCheckpointSaverConfig = {
  * ```
  */
 export class CdsCheckpointSaver extends BaseCheckpointSaver {
-  protected config: CdsCheckpointSaverConfig;
-
   // The graph name is used to scope the checkpoints and writes to a specific graph instance.
-  protected graphName: string;
+  #graphName: string;
+  #config: CdsCheckpointSaverConfig;
+  #fqnCheckpointsEntity: string;
+  #fqnCheckpointWritesEntity: string;
 
   constructor(config: CdsCheckpointSaverConfig, serde?: SerializerProtocol) {
     super(serde);
-    this.config = config;
-    this.graphName = config.name;
+    this.#config = config;
+    this.#graphName = config.name;
+    this.#fqnCheckpointsEntity =
+      config.fqnCheckpointsEntity ?? DEFAULT_FQN_ENTITY_CHECKPOINTS;
+    this.#fqnCheckpointWritesEntity =
+      config.fqnCheckpointWritesEntity ?? DEFAULT_FQN_ENTITY_CHECKPOINT_WRITES;
   }
 
   /**
@@ -94,6 +127,23 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
       return fn();
     }
     return cds.tx(async () => fn());
+  }
+
+  /**
+   * Deserializes raw {@link TCheckpointWrite} rows into LangGraph pending writes.
+   */
+  async #deserializePendingWrites(
+    writes: TCheckpointWrite[],
+  ): Promise<CheckpointPendingWrite[]> {
+    return Promise.all(
+      writes.map(async (w: TCheckpointWrite) => {
+        return [
+          w.taskId,
+          w.channel,
+          await this.serde.loadsTyped(w.type ?? "json", w.value ?? ""),
+        ] as CheckpointPendingWrite;
+      }),
+    );
   }
 
   async getTuple(config: RunnableConfig): Promise<CheckpointTuple | undefined> {
@@ -108,32 +158,31 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
       return undefined;
     }
 
-    let query = SELECT.one
-      .from(Checkpoints)
-      .columns((c) => {
-        (c.threadId,
-          c.namespace,
-          c.id,
-          c.parent_id,
-          c.type,
-          c.checkpoint,
-          c.metadata,
-          c.writes((w) => {
-            (w.taskId, w.channel, w.type, w.value);
-          }));
-      })
-      .where({
-        graphName: this.graphName,
-        threadId: threadId,
-        namespace: checkpointNamespace,
-        ...(checkpointId ? { id: checkpointId } : {}),
-      });
+    let query = SELECT.from(this.#fqnCheckpointsEntity).where({
+      graphName: this.#graphName,
+      threadId: threadId,
+      namespace: checkpointNamespace,
+      ...(checkpointId ? { id: checkpointId } : {}),
+    });
 
     if (!checkpointId) {
       query = query.orderBy("id desc").limit(1);
     }
 
-    const resCheckpoint = await query;
+    const { result } = await readParentsWithChildren<
+      TCheckpoint,
+      TCheckpointWrite
+    >({
+      match: CHECKPOINT_WRITES_MATCH,
+      readParents: async () => (await query) as TCheckpoint[],
+      readChildren: async ({ where }) =>
+        (await SELECT.from(this.#fqnCheckpointWritesEntity)
+          .where(where)
+          .orderBy("taskId", "idx")) as TCheckpointWrite[],
+      relationProperty: "writes",
+    });
+
+    const resCheckpoint = result[0];
     if (!resCheckpoint) {
       return undefined;
     }
@@ -148,14 +197,8 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
       resCheckpoint.metadata ?? "",
     )) as CheckpointMetadata;
 
-    const pendingWrites = await Promise.all(
-      (resCheckpoint.writes ?? []).map(async (w) => {
-        return [
-          w.taskId,
-          w.channel,
-          await this.serde.loadsTyped(w.type ?? "json", w.value ?? ""),
-        ] as [string, string, unknown];
-      }),
+    const pendingWrites = await this.#deserializePendingWrites(
+      resCheckpoint.writes ?? [],
     );
 
     if (checkpoint.v < 4 && resCheckpoint.parent_id) {
@@ -199,21 +242,9 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
     const checkpointNamespace: string | undefined =
       config.configurable?.checkpoint_ns;
 
-    let query = SELECT.from(Checkpoints)
-      .columns((c) => {
-        (c.threadId,
-          c.namespace,
-          c.id,
-          c.parent_id,
-          c.type,
-          c.checkpoint,
-          c.metadata,
-          c.writes((w) => {
-            (w.taskId, w.channel, w.type, w.value);
-          }));
-      })
+    let query = SELECT.from(this.#fqnCheckpointsEntity)
       .orderBy("id desc")
-      .where({ graphName: this.graphName });
+      .where({ graphName: this.#graphName });
 
     if (threadId !== undefined) {
       query = query.where({
@@ -244,15 +275,23 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
       query = query.limit(limit);
     }
 
-    const resCheckpoints = await query;
-    if (!resCheckpoints) {
-      return;
-    }
+    const { result: checkpointStates } = await readParentsWithChildren<
+      TCheckpoint,
+      TCheckpointWrite
+    >({
+      match: CHECKPOINT_WRITES_MATCH,
+      readParents: async () => (await query) as TCheckpoint[],
+      readChildren: async ({ where }) =>
+        (await SELECT.from(this.#fqnCheckpointWritesEntity)
+          .where(where)
+          .orderBy("taskId", "idx")) as TCheckpointWrite[],
+      relationProperty: "writes",
+    });
 
     let yielded = 0;
     // TODO: from minimum CDS 10 SQLite onwards, use `streaming` option
     // with CDS 9, the cursor is not released leading to errors
-    for (const checkpointState of resCheckpoints) {
+    for (const checkpointState of checkpointStates) {
       if (limit !== undefined && yielded >= limit) {
         break;
       }
@@ -277,14 +316,8 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
         checkpointState.checkpoint ?? "",
       )) as Checkpoint;
 
-      const pendingWrites = await Promise.all(
-        (checkpointState.writes ?? []).map(async (w) => {
-          return [
-            w.taskId,
-            w.channel,
-            await this.serde.loadsTyped(w.type ?? "json", w.value ?? ""),
-          ] as [string, string, unknown];
-        }),
+      const pendingWrites = await this.#deserializePendingWrites(
+        checkpointState.writes ?? [],
       );
 
       if (checkpoint.v < 4 && checkpointState.parent_id) {
@@ -372,25 +405,18 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
       );
     }
 
-    const expiresAt = this.config.ttl
-      ? new Date(Date.now() + this.config.ttl).toISOString()
+    const expiresAt = this.#config.ttl
+      ? new Date(Date.now() + this.#config.ttl).toISOString()
       : null;
 
     const valueDecoder = new TextDecoder("utf-8");
     await this.#execWithTx(async () =>
-      UPSERT.into(Checkpoints).entries({
-        graphName: this.graphName,
+      UPSERT.into(this.#fqnCheckpointsEntity).entries({
+        graphName: this.#graphName,
         id: checkpoint.id,
         namespace: checkpointNamespace,
         threadId: threadId,
-        parent: parentCheckpointId
-          ? {
-              graphName: this.graphName,
-              id: parentCheckpointId,
-              namespace: checkpointNamespace,
-              threadId: threadId,
-            }
-          : null,
+        parent_id: parentCheckpointId ?? null,
         type: type1,
         checkpoint: valueDecoder.decode(serializedCheckpoint),
         metadata: valueDecoder.decode(serializedMetadata),
@@ -430,13 +456,13 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
       );
     }
 
-    const pendingWrites: CheckpointWrite[] = await Promise.all(
+    const pendingWrites: TCheckpointWrite[] = await Promise.all(
       writes.map(async (write, idx) => {
         const [type, serializedValue] = await this.serde.dumpsTyped(write[1]);
         const valueDecoder = new TextDecoder("utf-8");
         return {
           threadId: threadId,
-          checkpoint_graphName: this.graphName,
+          checkpoint_graphName: this.#graphName,
           checkpoint_id: checkpointId,
           checkpoint_namespace: checkpointNamespace,
           checkpoint_threadId: threadId,
@@ -453,18 +479,18 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
     );
 
     await this.#execWithTx(async () =>
-      UPSERT.into(CheckpointWrites).entries(pendingWrites),
+      UPSERT.into(this.#fqnCheckpointWritesEntity).entries(pendingWrites),
     );
   }
 
   async deleteThread(threadId: string): Promise<void> {
     await this.#execWithTx(async () => {
-      await DELETE.from(CheckpointWrites).where({
-        checkpoint_graphName: this.graphName,
+      await DELETE.from(this.#fqnCheckpointWritesEntity).where({
+        checkpoint_graphName: this.#graphName,
         checkpoint_threadId: threadId,
       });
-      await DELETE.from(Checkpoints).where({
-        graphName: this.graphName,
+      await DELETE.from(this.#fqnCheckpointsEntity).where({
+        graphName: this.#graphName,
         threadId: threadId,
       });
     });
@@ -475,21 +501,21 @@ export class CdsCheckpointSaver extends BaseCheckpointSaver {
     threadId: string,
     parentId: string,
   ) {
-    const parentWrites = await SELECT.from(CheckpointWrites)
+    const parentWrites = (await SELECT.from(this.#fqnCheckpointWritesEntity)
       .where({
-        checkpoint_graphName: this.graphName,
+        checkpoint_graphName: this.#graphName,
         checkpoint_threadId: threadId,
         checkpoint_id: parentId,
         channel: TASKS,
       })
-      .orderBy("taskId", "idx");
+      .orderBy("taskId", "idx")) as TCheckpointWrite[];
 
     if (parentWrites === undefined || parentWrites.length === 0) {
       return;
     }
 
     checkpoint.channel_values[TASKS] = await Promise.all(
-      parentWrites.map((w) =>
+      parentWrites.map((w: TCheckpointWrite) =>
         this.serde.loadsTyped(w.type ?? "json", w.value ?? ""),
       ),
     );

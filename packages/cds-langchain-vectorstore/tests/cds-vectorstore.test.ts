@@ -37,26 +37,30 @@ beforeAll(async () => {
   };
 
   cds.db = await cds.connect.to("db");
+
+  // @ts-expect-error - The `deploy` method is not recognized by TypeScript, but it is available in the runtime environment.
   await cds.deploy(defaultFile, {}).to(cds.db);
+  // @ts-expect-error - The `deploy` method is not recognized by TypeScript, but it is available in the runtime environment.
   await cds.deploy(customFile, {}).to(cds.db);
 });
 
 afterAll(async () => {
+  // @ts-expect-error - The `disconnect` method is not recognized by TypeScript, but it is available in the runtime environment.
   await cds.db.disconnect?.();
 });
 
 beforeEach(async () => {
   await DELETE.from(DOCUMENTS_ENTITY).where({ storeName: "test" });
   await DELETE.from(DOCUMENT_METADATA_ENTITY).where({
-    document_storeName: "test",
+    storeName: "test",
   });
   await DELETE.from(DOCUMENTS_ENTITY).where({ storeName: "empty-store" });
   await DELETE.from(DOCUMENT_METADATA_ENTITY).where({
-    document_storeName: "empty-store",
+    storeName: "empty-store",
   });
   await DELETE.from(CUSTOM_DOCUMENTS_ENTITY).where({ storeName: "test" });
   await DELETE.from(CUSTOM_DOCUMENT_METADATA_ENTITY).where({
-    document_storeName: "test",
+    storeName: "test",
   });
 });
 
@@ -105,6 +109,9 @@ test("CDSVectorStore stores and retrieves document IDs", async () => {
   expect(results).toHaveLength(2);
   const resultIds = results.map((r) => r.id).sort();
   expect(resultIds).toEqual(["1", "2"]);
+  results.forEach((result) => {
+    expect(result.metadata.namespace).toBe(1);
+  });
 });
 
 test("CDSVectorStore as retriever can filter metadata", async () => {
@@ -202,7 +209,7 @@ test("CDSVectorStore sorts results in descending order of similarity", async () 
 
     await DELETE.from(DOCUMENTS_ENTITY).where({ storeName: "test" });
     await DELETE.from(DOCUMENT_METADATA_ENTITY).where({
-      document_storeName: "test",
+      storeName: "test",
     });
 
     for (const document of documentOrdering) {
@@ -375,6 +382,7 @@ test("CDSVectorStore with metadata filter $ne operator", async () => {
     { pageContent: "hello", metadata: { priority: 3 } },
     { pageContent: "hi", metadata: { priority: 5 } },
     { pageContent: "hey", metadata: { priority: 3 } },
+    { pageContent: "missing", metadata: { tier: "gold" } },
   ]);
 
   const results = await store.similaritySearch("hello", 3, {
@@ -440,7 +448,7 @@ test("CDSVectorStore with metadata filter $notIn operator", async () => {
   expect(results[0].metadata.priority).toBe(3);
 });
 
-test("CDSVectorStore with multiple metadata filter conditions (OR join)", async () => {
+test("CDSVectorStore with unmatched metadata filters returns no results", async () => {
   const embeddings = new SyntheticEmbeddings({
     vectorSize: 1536,
   });
@@ -453,15 +461,55 @@ test("CDSVectorStore with multiple metadata filter conditions (OR join)", async 
     { pageContent: "hey", metadata: { priority: 5 } },
   ]);
 
-  // multiple filter keys produce an OR join via mapMetadataFilterToCdsExpr
+  // multiple filter keys must all match the same document
   const results = await store.similaritySearch("hello", 3, {
     priority: { $eq: 1 },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    unused: undefined as any,
+    tier: "gold",
   });
 
-  // $eq:1 alone would match 1 doc; the undefined-valued key may affect results
-  expect(results.length).toBeGreaterThanOrEqual(1);
+  expect(results).toHaveLength(0);
+});
+
+test("CDSVectorStore with multiple metadata filters uses AND semantics", async () => {
+  const embeddings = new SyntheticEmbeddings({
+    vectorSize: 1536,
+  });
+
+  const store = new CDSVectorStore(embeddings, { name: "test" });
+
+  await store.addDocuments([
+    { pageContent: "hello", metadata: { priority: 1, tier: "gold" } },
+    { pageContent: "hi", metadata: { priority: 1, tier: "silver" } },
+    { pageContent: "hey", metadata: { priority: 2, tier: "gold" } },
+  ]);
+
+  const results = await store.similaritySearch("hello", 3, {
+    priority: { $eq: 1 },
+    tier: "gold",
+  });
+
+  expect(results).toHaveLength(1);
+  expect(results[0].metadata).toEqual({ priority: 1, tier: "gold" });
+});
+
+test("CDSVectorStore metadata filter matches string values stored as JSON", async () => {
+  const embeddings = new SyntheticEmbeddings({
+    vectorSize: 1536,
+  });
+
+  const store = new CDSVectorStore(embeddings, { name: "test" });
+
+  await store.addDocuments([
+    { pageContent: "hello", metadata: { tier: "gold" } },
+    { pageContent: "hi", metadata: { tier: "silver" } },
+  ]);
+
+  const results = await store.similaritySearch("hello", 2, {
+    tier: "gold",
+  });
+
+  expect(results).toHaveLength(1);
+  expect(results[0].metadata.tier).toBe("gold");
 });
 
 test("CDSVectorStore with custom threshold", async () => {

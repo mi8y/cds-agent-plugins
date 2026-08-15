@@ -7,11 +7,11 @@ using {
 } from '..';
 
 entity CustomDocuments : managed, VectorDocument {
-    embedding : Vector(3072);
-    metadata  : Composition of many CustomDocumentMetadata
-                    on metadata.document = $self;
+    embedding  : Vector(3072);
+    attributes : Composition of many CustomDocumentMetadata
+                     on attributes.document = $self;
 }
 
 entity CustomDocumentMetadata : VectorDocumentMetadata {
-    key document : Association to CustomDocuments;
+    document : Association to CustomDocuments;
 }

@@ -1,13 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
-  StoreItemFields,
-  StoreItems,
-} from "#cds-models/plugin/langgraph/persistence";
-import { CdsMemoryStore } from "@/memory/cds-memory";
+  CdsMemoryStore,
+  DEFAULT_FQN_ENTITY_STORE_ITEM_FIELDS,
+  DEFAULT_FQN_ENTITY_STORE_ITEMS,
+} from "@/memory/cds-memory";
 import { Embeddings } from "@langchain/core/embeddings";
 import { InvalidNamespaceError } from "@langchain/langgraph-checkpoint";
 import cds from "@sap/cds";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -46,7 +48,10 @@ describe("CdsMemoryStore", () => {
   let store: CdsMemoryStore;
 
   beforeAll(async () => {
-    const csn = await cds.load("index.cds").then(cds.minify);
+    const cdsFilePath = fileURLToPath(
+      import.meta.resolve("./model.cds", import.meta.url),
+    );
+    const csn = await cds.load(cdsFilePath).then(cds.minify);
     cds.model = cds.compile.for.nodejs(csn);
 
     cds.requires.db = {
@@ -58,7 +63,7 @@ describe("CdsMemoryStore", () => {
     cds.db = await cds.connect.to("db");
 
     // @ts-ignore
-    await cds.deploy("index.cds", {}).to(cds.db);
+    await cds.deploy(cdsFilePath, {}).to(cds.db);
   });
 
   afterAll(async () => {
@@ -68,8 +73,8 @@ describe("CdsMemoryStore", () => {
 
   beforeEach(async () => {
     store = new CdsMemoryStore({ name: "test-store" });
-    await DELETE.from(StoreItems);
-    await DELETE.from(StoreItemFields);
+    await DELETE.from(DEFAULT_FQN_ENTITY_STORE_ITEMS);
+    await DELETE.from(DEFAULT_FQN_ENTITY_STORE_ITEM_FIELDS);
   });
 
   // ---------------------------------------------------------------------------
@@ -445,7 +450,7 @@ describe("CdsMemoryStore", () => {
 
       embeddingStore = new CdsMemoryStore({
         name: "test-store-hybrid",
-        index: { embeddings: mockEmbedding },
+        embeddings: mockEmbedding,
       });
 
       await embeddingStore.put(["docs"], "doc1", {
@@ -495,6 +500,145 @@ describe("CdsMemoryStore", () => {
       expect(results.length).toBe(2);
       const keys = results.map((item) => item.key).sort();
       expect(keys).toEqual(["doc1", "doc2"]);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Search — Metadata Filter
+  // ---------------------------------------------------------------------------
+  describe("Search — Metadata Filter", () => {
+    beforeEach(async () => {
+      await store.put(["docs"], "doc1", {
+        title: "JavaScript Guide",
+        category: "programming",
+        difficulty: "beginner",
+      });
+
+      await store.put(["docs"], "doc2", {
+        title: "TypeScript Handbook",
+        category: "programming",
+        difficulty: "intermediate",
+      });
+
+      await store.put(["docs"], "doc3", {
+        title: "Python Basics",
+        category: "programming",
+        difficulty: "beginner",
+      });
+
+      await store.put(["recipes"], "recipe1", {
+        title: "Chocolate Cake",
+        category: "dessert",
+        difficulty: "easy",
+      });
+    });
+
+    it("should filter by direct equality on a metadata field", async () => {
+      const results = await store.search(["docs"], {
+        filter: { difficulty: "beginner" },
+      });
+
+      expect(results.length).toBe(2);
+      const keys = results.map((item) => item.key).sort();
+      expect(keys).toEqual(["doc1", "doc3"]);
+    });
+
+    it("should filter by $eq operator", async () => {
+      const results = await store.search(["docs"], {
+        filter: { difficulty: { $eq: "intermediate" } },
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].key).toBe("doc2");
+    });
+
+    it("should filter by $ne operator", async () => {
+      const results = await store.search(["docs"], {
+        filter: { difficulty: { $ne: "beginner" } },
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].key).toBe("doc2");
+    });
+
+    it("should combine multiple filter keys with AND semantics", async () => {
+      const results = await store.search(["docs"], {
+        filter: { category: "programming", difficulty: "beginner" },
+      });
+
+      expect(results.length).toBe(2);
+      const keys = results.map((item) => item.key).sort();
+      expect(keys).toEqual(["doc1", "doc3"]);
+    });
+
+    it("should return empty array when filter matches nothing", async () => {
+      const results = await store.search(["docs"], {
+        filter: { difficulty: "expert" },
+      });
+
+      expect(results).toEqual([]);
+    });
+
+    it("should respect namespace prefix when filtering", async () => {
+      const results = await store.search(["recipes"], {
+        filter: { category: "programming" },
+      });
+
+      expect(results).toEqual([]);
+    });
+
+    it("should combine filter with limit", async () => {
+      const results = await store.search(["docs"], {
+        filter: { category: "programming" },
+        limit: 1,
+      });
+
+      expect(results.length).toBe(1);
+    });
+
+    it("should filter by $in operator", async () => {
+      const results = await store.search(["docs"], {
+        filter: { difficulty: { $in: ["beginner", "expert"] } },
+      });
+
+      expect(results.length).toBe(2);
+      const keys = results.map((item) => item.key).sort();
+      expect(keys).toEqual(["doc1", "doc3"]);
+    });
+
+    it("should filter by $notIn operator", async () => {
+      await store.put(["docs"], "doc4", {});
+      const results = await store.search(["docs"], {
+        filter: { difficulty: { $notIn: ["beginner", "intermediate"] } },
+      });
+
+      // doc4 has no difficulty field -> it is not in the excluded set, but
+      // $notIn requires the field to exist, so doc4 is excluded.
+      expect(results.length).toBe(0);
+    });
+
+    it("should filter numeric field values", async () => {
+      await store.put(["docs"], "num1", { priority: 1 });
+      await store.put(["docs"], "num2", { priority: 2 });
+
+      const results = await store.search(["docs"], {
+        filter: { priority: 1 },
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].key).toBe("num1");
+    });
+
+    it("should filter boolean field values", async () => {
+      await store.put(["docs"], "bool1", { active: true });
+      await store.put(["docs"], "bool2", { active: false });
+
+      const results = await store.search(["docs"], {
+        filter: { active: false },
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].key).toBe("bool2");
     });
   });
 

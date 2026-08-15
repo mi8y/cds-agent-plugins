@@ -1,4 +1,4 @@
-using plugin.langgraph.persistence as langgraph from '@mi8y/cds-langgraph-persistence';
+using {plugin.langgraph.persistence as lp} from '../db/langgraph-checkpointer';
 
 service InfoService {
   entity Books {
@@ -7,5 +7,5 @@ service InfoService {
         author : String;
   }
 
-  entity Checkpoints as projection on langgraph.Checkpoints;
+  entity Checkpoints as projection on lp.Checkpoints;
 }

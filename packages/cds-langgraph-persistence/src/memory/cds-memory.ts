@@ -1,7 +1,4 @@
-import {
-  StoreItemFields,
-  StoreItems,
-} from "#cds-models/plugin/langgraph/persistence";
+import { StoreItem, StoreItemField } from "#cds-models/index";
 import { Embeddings } from "@langchain/core/embeddings";
 import {
   BaseStore,
@@ -14,8 +11,14 @@ import {
   SearchItem,
   SearchOperation,
 } from "@langchain/langgraph-checkpoint";
-import * as utils from "./utils";
 import cds from "@sap/cds";
+import * as utils from "./utils";
+import { readParentsWithChildren } from "@mi8y/cds-agent-utils";
+
+export const DEFAULT_FQN_ENTITY_STORE_ITEMS =
+  "plugin.langgraph.persistence.StoreItems";
+export const DEFAULT_FQN_ENTITY_STORE_ITEM_FIELDS =
+  "plugin.langgraph.persistence.StoreItemFields";
 
 export type CdsMemoryStoreConfig = {
   /**
@@ -25,23 +28,39 @@ export type CdsMemoryStoreConfig = {
    * the `StoreItems` entity, isolating store state per graph.
    */
   name: string;
-  index?: {
-    /**
-     * The embeddings model to use for generating vectors.
-     * This should be a LangChain Embeddings implementation.
-     */
-    embeddings: Embeddings;
-  };
+  /**
+   * The embeddings model to use for generating vectors.
+   * This should be a LangChain Embeddings implementation.
+   */
+  embeddings?: Embeddings;
+  /**
+   * The fully qualified name of the entity to use for storing items.
+   *
+   * @default "plugin.langgraph.persistence.StoreItems"
+   */
+  fqnStoreItemsEntity?: string;
+  /**
+   * The fully qualified name of the entity to use for storing item fields.
+   *
+   * @default "plugin.langgraph.persistence.StoreItemFields"
+   */
+  fqnStoreItemFieldsEntity?: string;
 };
 
 export class CdsMemoryStore extends BaseStore {
-  protected params: CdsMemoryStoreConfig;
-  protected graphName: string;
+  #params: CdsMemoryStoreConfig;
+  #graphName: string;
+  #fqnStoreItemsEntity: string;
+  #fqnStoreItemFieldsEntity: string;
 
   constructor(params: CdsMemoryStoreConfig) {
     super();
-    this.params = params;
-    this.graphName = params.name;
+    this.#params = params;
+    this.#graphName = params.name;
+    this.#fqnStoreItemsEntity =
+      params.fqnStoreItemsEntity ?? DEFAULT_FQN_ENTITY_STORE_ITEMS;
+    this.#fqnStoreItemFieldsEntity =
+      params.fqnStoreItemFieldsEntity ?? DEFAULT_FQN_ENTITY_STORE_ITEM_FIELDS;
   }
 
   async start(): Promise<void> {}
@@ -85,24 +104,24 @@ export class CdsMemoryStore extends BaseStore {
     namespace,
   }: GetOperation): Promise<Item | null> {
     const namespaceKey = utils.mapNamespaceToCds(namespace);
-    const storeItem = await SELECT.one
-      .from(StoreItems)
-      .columns((c) => {
-        c.id;
-        c.namespace;
-        c.createdAt;
-        c.modifiedAt;
-        c.fields((f) => {
-          f.name;
-          f.value;
-        });
-      })
-      .where({
-        graphName: this.graphName,
-        namespace: namespaceKey,
-        id: key,
-      });
-    return storeItem ? utils.mapStoreItemFromCds(storeItem) : null;
+    const storeItem = (await SELECT.one.from(this.#fqnStoreItemsEntity).where({
+      graphName: this.#graphName,
+      namespace: namespaceKey,
+      id: key,
+    })) as StoreItem | null;
+    if (!storeItem) {
+      return null;
+    }
+    const fields = await SELECT.from(this.#fqnStoreItemFieldsEntity).where({
+      graphName: this.#graphName,
+      namespace: namespaceKey,
+      id: key,
+    });
+
+    const item = utils.mapStoreItemFromCds(storeItem);
+    item.value = utils.mapStoreItemFieldsFromCds(fields);
+
+    return item;
   }
 
   private async searchOperation({
@@ -112,39 +131,33 @@ export class CdsMemoryStore extends BaseStore {
     offset,
     query,
   }: SearchOperation): Promise<SearchItem[]> {
+    // @ts-expect-error: The `expr` function is not recognized by TypeScript, but it is available in the runtime environment.
+    const { expr } = cds.ql;
+
     const namespacePrefixKey = utils.mapNamespaceToCds(namespacePrefix);
-    let cdsQuery = SELECT.from(StoreItems)
-      .columns((c) => {
-        c.id;
-        c.namespace;
-        c.createdAt;
-        c.modifiedAt;
-        c.fields((f) => {
-          f.name;
-          f.value;
-        });
-      })
+    let cdsQuery = SELECT.from(this.#fqnStoreItemsEntity)
       .where({
-        graphName: this.graphName,
+        graphName: this.#graphName,
         namespace: { like: `${namespacePrefixKey}%` },
       })
       .limit(limit ?? 10, offset ?? 0)
       .orderBy("createdAt desc");
 
     if (filter) {
-      const cdsFilter = utils.mapFilterToCds(filter);
-      cdsQuery = cdsQuery.where({
-        ...cdsFilter,
-      });
+      const metadataWhere = utils.mapMetadataFilterToCdsWhere(
+        this.#fqnStoreItemFieldsEntity,
+        filter,
+        this.#graphName,
+        namespacePrefixKey,
+      );
+      cdsQuery = cdsQuery.where(
+        metadataWhere ? expr(metadataWhere) : undefined,
+      );
     }
 
     if (query) {
-      // @ts-expect-error: The `expr` function is not recognized by TypeScript, but it is available in the runtime environment.
-      const { expr } = cds.ql;
-
-      if (this.params.index?.embeddings) {
-        const queryEmbedding =
-          await this.params.index.embeddings.embedQuery(query);
+      if (this.#params.embeddings) {
+        const queryEmbedding = await this.#params.embeddings.embedQuery(query);
         cdsQuery = cdsQuery.where(
           expr`cosine_similarity(fields.embedding, ${JSON.stringify(queryEmbedding)}) > 0.75`,
         );
@@ -159,9 +172,29 @@ export class CdsMemoryStore extends BaseStore {
       }
     }
 
-    const items = await cdsQuery;
+    const relationProperty = "fields";
+    const { result } = await readParentsWithChildren<StoreItem, StoreItemField>(
+      {
+        match: [
+          { parent: "graphName", child: "graphName" },
+          { parent: "namespace", child: "namespace" },
+          { parent: "id", child: "id" },
+        ],
+        readParents: async () => cdsQuery,
+        readChildren: async ({ where }) => {
+          return await SELECT.from(this.#fqnStoreItemFieldsEntity).where(where);
+        },
+        relationProperty: relationProperty,
+      },
+    );
 
-    return items.map(utils.mapStoreItemFromCds);
+    return result.map((i) => {
+      const searchItem = utils.mapStoreItemFromCds(i);
+      searchItem.value = utils.mapStoreItemFieldsFromCds(
+        i[relationProperty] ?? [],
+      );
+      return searchItem;
+    });
   }
 
   private async putOperation({
@@ -171,31 +204,31 @@ export class CdsMemoryStore extends BaseStore {
   }: PutOperation): Promise<void> {
     const namespaceKey = utils.mapNamespaceToCds(namespace);
 
-    await UPSERT.into(StoreItems).entries(
-      utils.mapStoreItemToCds({ key, namespace }, this.graphName),
+    await UPSERT.into(this.#fqnStoreItemsEntity).entries(
+      utils.mapStoreItemToCds({ key, namespace }, this.#graphName),
     );
 
     let entries = utils.mapStoreItemFieldsToCds(
       value ?? {},
       namespaceKey,
       key,
-      this.graphName,
+      this.#graphName,
     );
-    await DELETE.from(StoreItemFields).where({
-      item_graphName: this.graphName,
-      item_namespace: namespaceKey,
-      item_id: key,
+    await DELETE.from(this.#fqnStoreItemFieldsEntity).where({
+      graphName: this.#graphName,
+      namespace: namespaceKey,
+      id: key,
     });
 
     if (entries.length > 0) {
       // If embeddings are configured, embed the fields before inserting
-      if (this.params.index?.embeddings) {
+      if (this.#params.embeddings) {
         entries = await utils.embedCdsStoreItemFields(
           entries,
-          this.params.index.embeddings,
+          this.#params.embeddings,
         );
       }
-      await INSERT.into(StoreItemFields).entries(...entries);
+      await INSERT.into(this.#fqnStoreItemFieldsEntity).entries(...entries);
     }
   }
 
@@ -206,11 +239,9 @@ export class CdsMemoryStore extends BaseStore {
     offset,
   }: ListNamespacesOperation): Promise<string[][]> {
     let cdsQuery = SELECT.distinct
-      .from(StoreItems)
-      .columns((c) => {
-        c.namespace;
-      })
-      .where({ graphName: this.graphName })
+      .from(this.#fqnStoreItemsEntity)
+      .columns("namespace")
+      .where({ graphName: this.#graphName })
       .orderBy("namespace")
       .limit(limit ?? 100, offset ?? 0);
 
@@ -231,20 +262,24 @@ export class CdsMemoryStore extends BaseStore {
       }
     }
 
-    const items = await cdsQuery;
+    const items = (await cdsQuery) as Array<{ namespace?: string | null }>;
 
     // map the namespaces from the stringified format to the expected format
     let namespaces = items
-      .filter((item) => item.namespace !== null)
-      .map((result) => result.namespace as string)
+      .filter((item: { namespace?: string | null }) => item.namespace !== null)
+      .map(
+        (result: { namespace?: string | null }) => result.namespace as string,
+      )
       .map(utils.mapNamespaceFromCds);
 
     if (maxDepth !== undefined) {
       // collect unique namespaces up to maxDepth
       const namespacesSet = new Set(
-        namespaces.map((ns) => utils.mapNamespaceToCds(ns.slice(0, maxDepth))),
+        namespaces.map((ns: string[]) =>
+          utils.mapNamespaceToCds(ns.slice(0, maxDepth)),
+        ),
       );
-      namespaces = [...namespacesSet].map((ns) =>
+      namespaces = [...namespacesSet].map((ns: string) =>
         utils.mapNamespaceFromCds(ns),
       );
     }
@@ -257,8 +292,8 @@ export class CdsMemoryStore extends BaseStore {
     namespace,
   }: GetOperation): Promise<void> {
     const namespaceKey = utils.mapNamespaceToCds(namespace);
-    await DELETE.from(StoreItems).where({
-      graphName: this.graphName,
+    await DELETE.from(this.#fqnStoreItemsEntity).where({
+      graphName: this.#graphName,
       namespace: namespaceKey,
       id: key,
     });

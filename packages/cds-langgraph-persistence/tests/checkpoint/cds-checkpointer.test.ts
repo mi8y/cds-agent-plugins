@@ -1,8 +1,8 @@
 import {
-  Checkpoints,
-  CheckpointWrites,
-} from "#cds-models/plugin/langgraph/persistence";
-import { CdsCheckpointSaver } from "@/index";
+  CdsCheckpointSaver,
+  DEFAULT_FQN_ENTITY_CHECKPOINT_WRITES,
+  DEFAULT_FQN_ENTITY_CHECKPOINTS,
+} from "@/checkpoint/cds-checkpointer";
 import {
   CheckpointSaverTestInitializer,
   validate,
@@ -22,9 +22,8 @@ export const cdsCheckpointSaverTestInitializer: CheckpointSaverTestInitializer<C
 
       // cds file from @mi8y/langgraph-cds-model package
       const cdsFilePath = fileURLToPath(
-        import.meta.resolve("@mi8y/cds-langgraph-persistence/index.cds"),
+        import.meta.resolve("./model.cds", import.meta.url),
       );
-
       const csn = await cds.load(cdsFilePath).then(cds.minify);
       cds.model = cds.compile.for.nodejs(csn);
 
@@ -50,8 +49,8 @@ export const cdsCheckpointSaverTestInitializer: CheckpointSaverTestInitializer<C
     },
 
     async destroyCheckpointer() {
-      await DELETE.from(CheckpointWrites);
-      await DELETE.from(Checkpoints);
+      await DELETE.from(DEFAULT_FQN_ENTITY_CHECKPOINT_WRITES);
+      await DELETE.from(DEFAULT_FQN_ENTITY_CHECKPOINTS);
     },
   };
 

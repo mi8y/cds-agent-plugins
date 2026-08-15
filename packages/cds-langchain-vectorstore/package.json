@@ -12,7 +12,7 @@
   "bugs": {
     "url": "https://github.com/mi8y/cds-agent-plugins/issues"
   },
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -44,7 +44,9 @@
     "vectorstore",
     "retrieval"
   ],
-  "dependencies": {},
+  "dependencies": {
+    "@mi8y/cds-agent-utils": "workspace:*"
+  },
   "devDependencies": {
     "@cap-js/cds-typer": "^0.40.0",
     "@cap-js/cds-types": "^0.18.0",

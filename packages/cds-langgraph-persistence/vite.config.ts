@@ -1,8 +1,12 @@
 /// <reference types="vitest/config" />
+import { builtinModules } from "module";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
-import { builtinModules } from "module";
 import pkg from "./package.json";
+
+const externalDependencies = Object.keys(pkg.dependencies || {}).filter(
+  (dependency) => dependency !== "@mi8y/cds-agent-utils",
+);
 
 export default defineConfig({
   plugins: [
@@ -31,7 +35,7 @@ export default defineConfig({
         // ignore dependencies when bundling
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
-        ...Object.keys(pkg.dependencies || {}),
+        ...externalDependencies,
         ...Object.keys(pkg.peerDependencies || {}),
       ],
     },
@@ -39,6 +43,7 @@ export default defineConfig({
 
   // Testing Configuration (Vitest)
   test: {
+    name: "cds-langgraph-persistence",
     globals: true,
     root: import.meta.dirname,
     environment: "node",

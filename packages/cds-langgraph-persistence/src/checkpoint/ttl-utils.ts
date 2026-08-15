@@ -1,6 +1,8 @@
-import { CdsCheckpointSaver } from "./cds-checkpointer";
-import { Checkpoints } from "#cds-models/plugin/langgraph/persistence";
 import cds from "@sap/cds";
+import {
+  CdsCheckpointSaver,
+  DEFAULT_FQN_ENTITY_CHECKPOINTS,
+} from "@/checkpoint/cds-checkpointer";
 
 const LOG = cds.log("cds-langgraph-persistence");
 
@@ -35,7 +37,7 @@ async function purgeExpiredCheckpoints(): Promise<PurgedThreadInfo> {
   }
 
   // first find all the threads which are expired
-  const expiredThreads = await SELECT.from(Checkpoints)
+  const expiredThreads = await SELECT.from(DEFAULT_FQN_ENTITY_CHECKPOINTS)
     .columns("graphName", "threadId", "expiresAt")
     .groupBy("graphName", "threadId")
     .where({ expiresAt: { "!=": null }, and: { expiresAt: { "<": now } } })
