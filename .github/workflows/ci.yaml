@@ -151,7 +151,7 @@ jobs:
       - name: "Integration tests: Install test dependencies"
         shell: bash
         run: |
-          cd packages/cds-langgraph-integration-tests
+          cd packages/integration-tests
           pnpm add @sap/cds@${{ matrix.cap-version[0] }}
           pnpm add -D @cap-js/sqlite@${{ matrix.cap-version[1] }} @cap-js/cds-test@${{ matrix.cap-version[2] }} @sap/cds-dk@${{ matrix.cap-version[0] }}
           pnpm exec cds version --info
@@ -159,8 +159,8 @@ jobs:
       - name: "Integration tests:Run LangGraph persistence add commands"
         shell: bash
         run: |
-          cd packages/cds-langgraph-integration-tests
-          export CDS_ROOT="$GITHUB_WORKSPACE/packages/cds-langgraph-integration-tests"
+          cd packages/integration-tests
+          export CDS_ROOT="$GITHUB_WORKSPACE/packages/integration-tests"
           pnpm exec cds add langgraph-checkpointer
           pnpm exec cds add langgraph-memorystore
 

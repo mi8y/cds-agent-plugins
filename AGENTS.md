@@ -11,7 +11,7 @@ This is a turbo-based monorepo containing CDS plugins for building production-re
 │   ├── cds-agent-utils
 │   │   ├── AGENTS.md <- Read this for common utils
 │   │   └── ...
-│   ├── cds-langgraph-integration-tests
+│   ├── integration-tests
 │   │   ├── AGENTS.md <- Read this for integration test setup
 │   │   └── ...
 │   ├── cds-langgraph-persistence

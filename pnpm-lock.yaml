@@ -134,7 +134,7 @@ importers:
         specifier: ^8.65.0
         version: 8.65.0(eslint@10.6.0)(typescript@6.0.3)
 
-  packages/cds-langgraph-integration-tests:
+  packages/integration-tests:
     dependencies:
       '@mi8y/cds-langgraph-persistence':
         specifier: workspace:*
