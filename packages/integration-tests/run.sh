@@ -87,7 +87,8 @@ for combo in "${VERSIONS[@]}"; do
 
   echo ""
   echo "→ Running 'add' command..."
-  pnpm exec cds add langgraph-persistence
+  pnpm exec cds add langgraph-checkpointer
+  pnpm exec cds add langgraph-memorystore
 
   echo ""
   echo "→ Running tests..."
@@ -103,7 +104,8 @@ for combo in "${VERSIONS[@]}"; do
   echo ""
   echo "→ Cleaning up..."
   rm -rf node_modules pnpm-lock.yaml
-  rm srv/langgraph-persistence.cds 2>/dev/null || true
+  rm db/langgraph-checkpointer.cds 2>/dev/null || true
+  rm db/langgraph-memorystore.cds 2>/dev/null || true
 
   popd > /dev/null
 done
