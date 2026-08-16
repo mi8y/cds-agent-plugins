@@ -44,6 +44,8 @@ jobs:
             hotfix
           scopes: |
             cds-langgraph-persistence
+            cds-langgraph-checkpointer
+            cds-langgraph-memorystore
             cds-langchain-vectorstore
             cds-langchain-telemetry
             docs

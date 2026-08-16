@@ -53,9 +53,9 @@ async function writeCdsFile(cdsFileRelPath, cdsContent, description) {
 }
 
 async function addCheckpointerEntities() {
-  const srvRelPath = cds.env.folders?.srv || "srv/";
+  const dbPath = cds.env.folders?.db || "db/";
   const cdsFileRelPath = cds.utils.path.join(
-    srvRelPath,
+    dbPath,
     "langgraph-checkpointer.cds",
   );
   await writeCdsFile(
@@ -66,9 +66,9 @@ async function addCheckpointerEntities() {
 }
 
 async function addMemoryStoreEntities() {
-  const srvRelPath = cds.env.folders?.srv || "srv/";
+  const dbPath = cds.env.folders?.db || "db/";
   const cdsFileRelPath = cds.utils.path.join(
-    srvRelPath,
+    dbPath,
     "langgraph-memorystore.cds",
   );
   await writeCdsFile(
