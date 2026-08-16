@@ -1,5 +1,17 @@
 # @mi8y/cds-langgraph-persistence
 
+## 0.7.0
+
+### Minor Changes
+
+- a72a335: - Replace shipped concrete persistence entities with reusable CDS aspects.
+  - Add `cds add langgraph-checkpointer` and `cds add langgraph-memorystore` for generating default entities.
+  - Retain `cds add langgraph-persistence` as a compatibility alias that runs both generators.
+
+### Patch Changes
+
+- 52db638: Updated path from `srv/` to `db/` for the generated CDS files
+
 ## 0.6.0
 
 ### Minor Changes
